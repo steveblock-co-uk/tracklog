@@ -3,6 +3,7 @@
   <head>
     <script type="text/javascript">
       // TODO:
+      // - Replace node with DOMParser builtin - see index.html.190612
       // - Recalc maximum speed
       // - Write to file with file API?
 
@@ -211,10 +212,10 @@
           while (bail > 0) {
             //console.log('Looping: stream = ' + stream.string());
             if (stream.string().charAt(0) != LAB) {
-              throw new Error('Must start with left angle brace');
+              throw new Error('Must start with left angle brace. Got \'' + stream.string().substr(100) + '\'');
             }
             // If the next tag is a close tag, bail
-            // TODO: could we eliminate the search here by trimming the whitespace?
+            // TODO: Could we eliminate the search here by trimming the whitespace?
             if (stream.string().charAt(stream.string().indexOf(LAB) + 1) == '/') {
               //console.log('Got close tag for ' + this.tag_ + ', breaking');
               break;
