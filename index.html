@@ -6,6 +6,7 @@
       // - Replace node with DOMParser builtin - see index.html.190612
       // - Recalc maximum speed
       // - Write to file with file API?
+      // - Add ability to merge multiple files
 
       //////////////////////////////////////////////////////////////////////////
       // Globals
@@ -47,6 +48,9 @@
       // Removes from s everything up to and including the first ocurrence of string str
       function trimLeft(s, str) {
         var i = s.indexOf(str);
+        if (i == -1) {
+          throw new Error('\'' + str + '\' not found in string');
+        }
         return s.substr(i + str.length);
       }
       // Removes from s the first ocurrence of string str and everything following
@@ -120,7 +124,7 @@
       }
       function convert(node) {
         // Convert to our format
-        activities = new Activities(node.childAt(0));
+        activities = new Activities(node.firstChildOfType('Activities'));
 
         // Display
         var display = document.getElementById('display');
@@ -199,20 +203,25 @@
             this.params_[x[0]] = x[1].substr(1, x[1].length - 2);
           }
         }
-        //console.log('Node(): tag_ = ' + this.tag_);
         stream.advancePast(RAB);
         stream.trim();
-        // Error check
-        if (this.tag_.charAt(0) == '/') {
-          throw new Error('Unexpected close tag');
+        // Handle single tags
+        var tagLength = this.tag_.length;
+        if (this.tag_.charAt(tagLength - 1) == '/') {
+          this.tag_ = this.tag_.substr(0, tagLength - 1);
+          //console.log('Found single tag ' + this.tag_);
+          return;
         }
-        // If the next character in the stream is a left angle brace, but doesn't start an end node, it must be child nodes
+        //console.log('Node(): tag_ = ' + this.tag_);
+	// If the next character in the stream is a left angle brace, but
+	// doesn't start an end node, it must be the start of child nodes
+        // TODO: Can we simplify the logic for this loop?
         if (stream.string().charAt(0) == LAB && stream.string().charAt(1) != '/') {
-          var bail = 10000;
-          while (bail > 0) {
+          while (true) {
             //console.log('Looping: stream = ' + stream.string());
             if (stream.string().charAt(0) != LAB) {
-              throw new Error('Must start with left angle brace. Got \'' + stream.string().substr(100) + '\'');
+              throw new Error('Must start with left angle brace. '
+                              + 'Got \'' + stream.string() + '\'');
             }
             // If the next tag is a close tag, bail
             // TODO: Could we eliminate the search here by trimming the whitespace?
@@ -222,14 +231,17 @@
             }
             // Otherwise, assume it's a well-formed tag and create a new Node
             this.children_.push(new Node(stream));
-            bail--;
           }
         } else {
           // Otherwise read data. This may be the empty string.
           this.data_ = trimRight(stream.string(), LAB);
           //console.log('Got data: ' + this.data_);
         }
-        stream.advancePast(this.closeTag());
+        try {
+          stream.advancePast(this.closeTag());
+        } catch(e) {
+          throw new Error('Malformed input: failed to find close tag for tag ' + this.tag_ + '. Next input is ' + stream.string().substr(0, 100) + ' ...');
+        }
         stream.trim();
         //console.log('Node(): Done: tag_ = ' + this.tag_);
       };
@@ -490,8 +502,12 @@
         this.tracks_ = [];
         for (var i = 0; i < node.numChildren(); i++) {
           if (node.childAt(i).tag_ == 'Track') {
-            this.tracks_.push(new Track(node.childAt(i)));
-            var count = this.tracks_.length;
+            // The Track constructor will fail and throw if no valid trackpoints are found.
+            try {
+              this.tracks_.push(new Track(node.childAt(i)));
+            } catch(e) {
+              //console.log(e);
+            }
           }
         }
         this.dom_ = createDiv('');
@@ -639,9 +655,10 @@
           errorMessages.push('Start time inconsistent');
           result = false;
         }
-        // Total time field decimals, but time stamps do not.
+        // Total time field uses decimals, but time stamps do not.
         if (Math.abs(this.totalTimeSeconds_ - this.calculateTotalTime()) > 0.5) {
-          errorMessages.push('Total time inconsistent');
+          errorMessages.push('Total time inconsistent: ' + this.totalTimeSeconds_ +
+                             ' vs. ' + this.calculateTotalTime());
           result = false;
         }
         if (this.distanceMeters_ != this.calculateDistance()) {
@@ -657,7 +674,8 @@
         for (var i = 1; i < this.tracks_.length; i++) {
           if (this.tracks_[i - 1].lastTrackpoint().distanceMeters_ !=
               this.tracks_[i].firstTrackpoint().distanceMeters_) {
-            errorMessages.push('Distance discrepancy between tracks ' + i + ' and ' + (i + 1));
+            errorMessages.push('Distance discrepancy between tracks ' + i + ' and ' +
+                               (i + 1));
             result = false;
           }
         }
@@ -691,9 +709,16 @@
         // No metadata and all children are type Trackpoint
         for (var i = 0; i < node.numChildren(); i++) {
           var trackpoint = node.childAt(i);
-          if (trackpoint.numChildren() > 1) {
-            this.trackpoints_.push(new Trackpoint(trackpoint));
+	  // Some trackpoints contain only a timestamp. No idea why. There
+	  // seems to be no pattern, so just ignore them.
+          if (trackpoint.numChildren() == 1) {
+            //console.log('Skipping empty trackpoint');
+            continue;
           }
+          this.trackpoints_.push(new Trackpoint(trackpoint));
+        }
+        if (this.trackpoints_.length == 0) {
+          throw new Error('No viable trackpoints found');
         }
         this.dom_ = document.createElement('table');
         this.rebuildDom();
