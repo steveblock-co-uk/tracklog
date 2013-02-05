@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tracklog editor</title>
+    <script type="text/javascript">
+      function load() {
+        console.log('load()');
+        var file = document.getElementById('file').files[0];
+        if (!file) {
+          console.log('No file');
+          return;
+        }
+        var reader = new FileReader();
+
+        // Read file into memory as UTF-16      
+        reader.readAsText(file);
+
+        // Handle progress, success, and errors
+        reader.onloadstart = function() { console.log('readstart'); };
+        reader.onprogress = updateProgress;
+        reader.onload = loaded;
+        reader.onerror = errorHandler;
+        console.log('done');
+      }
+      function updateProgress(evt) {
+        if (evt.lengthComputable) {
+          // evt.loaded and evt.total are ProgressEvent properties
+          var loaded = (evt.loaded / evt.total);
+          console.log('updateProgress(): ' + loaded + '%');
+        }
+      }
+      function loaded(evt) {  
+        txt = evt.target.result;
+        parser = new DOMParser();
+        xmlDoc = parser.parseFromString(txt, "text/xml");
+        console.log(xmlDoc);
+        // TODO: Hanlde multiple activities
+        activity = xmlDoc.getElementsByTagName('Activity')[0];
+        laps = activity.getElementsByTagName('Lap');
+        // TODO: Can a lap have multiple tracks?
+        route = document.getElementById('route');
+        for (i = 0; i < laps.length; i++) {
+          lap = laps[i];
+          trackpoints = lap.getElementsByTagName('Trackpoint');
+          lapElem = document.createElement('div');
+          lapElem.innerText = 'Lap ' + i;
+          trackpointsElem = document.createElement('div');
+          span = document.createElement('span');
+          span.innerText = trackpoints.length + ' trackpoints';
+          trackpointsElem.appendChild(span);
+          link = document.createElement('a');
+          link.innerText = 'expand';
+          trackpointsElem.appendChild(link);
+          lapElem.appendChild(trackpointsElem);
+          route.appendChild(lapElem);
+        }
+      }
+      function errorHandler(evt) {  
+        console.log('errorHandler()');
+      }
+    </script>
+  </head>
+  <body>
+    <form>
+      GPX file<input id="file" type="file">
+      <p><a href="#" onclick="load()">load</a>
+    </form>
+    <div id="route"></div>
+  </body>
+</html>
