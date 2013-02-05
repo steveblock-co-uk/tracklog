@@ -50,7 +50,6 @@
       // - Update distance/time between laps/activities when deleting tracks/laps
       // - Show tracks on map
       // - Allow manual override of displacement for merging laps/activities - does this make sense?
-      // - Replace node with DOMParser builtin - see index.html.190612
       // - Add tests
       // - Recalc maximum speed
       // - Write to file with file API?
@@ -61,12 +60,8 @@
       var activities;
       // The XML currently being read in.
       var xmlInput;
-      // The XML header. Cached from the first XML file we read.
-      var xmlHeader = null;
       // The root node for the output XML. Cached from the first XML file we read.
-      var trainingCenterDatabase = null;
-      var LAB = '<';
-      var RAB = '>';
+      var root = null;
       var MAX_CONSECUTIVE_TIME_ONLY_TRACKPOINTS = 2;
 
       //////////////////////////////////////////////////////////////////////////
@@ -99,18 +94,6 @@
         }
         delete array[array.length - 1];
         array.length--;
-      }
-      // Removes from s everything up to and including the first ocurrence of string str
-      function trimLeft(s, str) {
-        var i = s.indexOf(str);
-        if (i == -1) {
-          throw new Error('\'' + str + '\' not found in string');
-        }
-        return s.substr(i + str.length);
-      }
-      // Removes from s the first ocurrence of string str and everything following
-      function trimRight(s, str) {
-        return s.split(str)[0];
       }
       function createDiv(className) {
         var div = document.createElement('div');
@@ -147,6 +130,11 @@
         li.innerText = text;
         return li;
       }
+      function createTextElement(type, value) {
+        var element = document.createElementNS(null, type);
+        element.textContent = value;
+        return element;
+      }
 
       //////////////////////////////////////////////////////////////////////////
       // Main
@@ -166,7 +154,7 @@
         var reader = new FileReader();
         reader.readAsText(file, "UTF-8");
 	// No need for load progress updates, as even large files are quick to
-	// load compared ot parsing.
+	// load compared to parsing.
         reader.onload = loaded;
         reader.onerror = errorHandler;
       }
@@ -176,18 +164,7 @@
         setTimeout(function() { parse(fileString); }, 0);
       }
       function parse(fileString) {
-        // Extract the XML header. Note we can't parse it using node because it's not a regular node.
-        if (fileString.indexOf('<?xml') != 0) {
-          throw new Error('Input is not XML!');
-          return;
-        }
-        var i = fileString.indexOf('>');
-        if (xmlHeader == null) {
-          xmlHeader = fileString.substr(0, i + 1);
-        }
-        fileString = fileString.substr(i + 1);
-
-        inputXml = new Node(new Stream(fileString));
+        inputXml = (new DOMParser).parseFromString(fileString, "text/xml");
         document.getElementById('progress').innerText = 'Converting ...';
         setTimeout(function() { convert(); }, 0);
       }
@@ -195,11 +172,16 @@
         // Convert to our format
         activities.addFromXml(inputXml.getElementsByTagName('Activities')[0]);
 
-        // Cache root node for use in output.
-        if (trainingCenterDatabase == null) {
-          trainingCenterDatabase = inputXml;
-          trainingCenterDatabase.childNodes = [];
+        // Cache XML header and root node
+        if (root === null) {
+          root = inputXml;
+          var trainingCenterDatabase = root.firstChild;
+          // There may be multiple nodes, including text nodes.
+          while (trainingCenterDatabase.childNodes.length > 0) {
+            trainingCenterDatabase.removeChild(trainingCenterDatabase.firstChild);
+          }
         }
+
         document.getElementById('progress').innerText = 'Ready';
       }
       function errorHandler(evt) {
@@ -210,152 +192,14 @@
       // Dumping
       // TODO: Call this automatically after each modification, or onbeforeclick on download link?
       function dump() {
-        trainingCenterDatabase.childNodes.push(activities.toXml());
-        //console.log(printNode(trainingCenterDatabase));
-        var str = xmlHeader + '\n' + printNode(trainingCenterDatabase);
-        trainingCenterDatabase.childNodes = [];
+        var trainingCenterDatabase = root.firstChild;
+        trainingCenterDatabase.appendChild(activities.toXml());
+        var str = (new XMLSerializer).serializeToString(root);
+        trainingCenterDatabase.removeChild(trainingCenterDatabase.firstChild);
         var dumpLink = document.getElementById('dumpLink');
         // TODO: Chrome crashes if the URL exceeds 2M characters, even for download URLS.
         dumpLink.href = 'data:text/xml,' + escape(str);
         dumpLink.download = document.getElementById('datafile').files[0].name.replace(/\.tcx$/, "-modified.tcx");
-      }
-
-      //////////////////////////////////////////////////////////////////////////
-      // Stream - Exists so a function passed a Stream can advance the start pos
-      Stream = function(str) {
-        this.str_ = str;
-      };
-      Stream.prototype.advancePast = function(x) {
-        this.str_ = trimLeft(this.str_, x);
-      };
-      Stream.prototype.trim = function() {
-        this.str_ = this.str_.trim();
-      };
-      Stream.prototype.string = function() {
-        return this.str_;
-      };
-
-      //////////////////////////////////////////////////////////////////////////
-      // Node
-      Node = function(arg1, arg2) {
-        this.childNodes = [];
-        this.params_ = {};
-        if (typeof arg1 == 'string') {
-          this.tagName = arg1;
-          this.textContent = arg2;
-        } else if (arg1 instanceof Stream) {
-          this.fromStream(arg1);
-        }
-      };
-      Node.prototype.getAttribute = function(key) {
-        return this.params_[key];
-      };
-      Node.prototype.setAttribute = function(key, value) {
-        this.params_[key] = value;
-      };
-      // Creates a Node from the stream. Ignores cruft in the stream after the end tag.
-      Node.prototype.fromStream = function(stream) {
-        // Later code assumes no whitespace between tags
-        stream.trim();
-        if (stream.string().charAt(0) != LAB) {
-          throw new Error('Must start with left angle brace');
-        }
-        stream.advancePast(LAB);
-        // Handle params
-        var tagAndParams = trimRight(stream.string(), RAB);
-        var params = tagAndParams.split(' ');
-        this.tagName = params[0];
-        for (var i = 1; i < params.length; i++) {
-          var x = params[i].split('=');
-          if (x.length == 2) {
-            this.params_[x[0]] = x[1].substr(1, x[1].length - 2);
-          }
-        }
-        stream.advancePast(RAB);
-        stream.trim();
-        // Handle single tags
-        var tagLength = this.tagName.length;
-        if (this.tagName.charAt(tagLength - 1) == '/') {
-          this.tagName = this.tagName.substr(0, tagLength - 1);
-          //console.log('Found single tag ' + this.tagName);
-          return;
-        }
-        //console.log('Node(): tagName = ' + this.tagName);
-	// If the next character in the stream is a left angle brace, but
-	// doesn't start an end node, it must be the start of child nodes
-        // TODO: Can we simplify the logic for this loop?
-        if (stream.string().charAt(0) == LAB && stream.string().charAt(1) != '/') {
-          while (true) {
-            //console.log('Looping: stream = ' + stream.string());
-            if (stream.string().charAt(0) != LAB) {
-              throw new Error('Must start with left angle brace. '
-                              + 'Got \'' + stream.string() + '\'');
-            }
-            // If the next tag is a close tag, bail
-            // TODO: Could we eliminate the search here by trimming the whitespace?
-            if (stream.string().charAt(stream.string().indexOf(LAB) + 1) == '/') {
-              //console.log('Got close tag for ' + this.tagName + ', breaking');
-              break;
-            }
-            // Otherwise, assume it's a well-formed tag and create a new Node
-            this.childNodes.push(new Node(stream));
-          }
-        } else {
-          // Otherwise read data. This may be the empty string.
-          this.textContent = trimRight(stream.string(), LAB);
-          //console.log('Got data: ' + this.textContent);
-        }
-        try {
-          stream.advancePast(this.closeTag());
-        } catch(e) {
-          throw new Error('Malformed input: failed to find close tag for tag ' + this.tagName + '. Next input is ' + stream.string().substr(0, 100) + ' ...');
-        }
-        stream.trim();
-        //console.log('Node(): Done: tagName = ' + this.tagName);
-      };
-      Node.prototype.openTag = function() {
-        var str = LAB + this.tagName;
-        for (var i in this.params_) {
-          str += ' ' + i + '=\'' + this.params_[i] + '\'';
-        }
-        return str + RAB;
-      };
-      Node.prototype.closeTag = function() {
-        return LAB + '/' + this.tagName + RAB;
-      };
-      Node.prototype.getElementsByTagName = function(type) {
-        var ret = [];
-        for (var i = 0; i < this.childNodes.length; i++) {
-          if (this.childNodes[i].tagName == type) {
-            ret.push(this.childNodes[i]);
-          }
-        }
-        return ret;
-      };
-
-      //////////////////////////////////////////////////////////////////////////
-      // Printer
-      function printNode(node, depth) {
-        var increment = '  ';
-        if (depth == undefined) {
-          depth = 0;
-        }
-        var indent = '';
-        for (var i = 0; i < depth; i++) {
-          indent += increment;
-        }
-        x = indent + node.openTag();
-        if (node.childNodes.length == 0) {
-          x += node.textContent;
-        } else {
-          x += '\n';
-          for (var i = 0; i < node.childNodes.length; i++) {
-            x += printNode(node.childNodes[i], depth + 1);
-          }
-          x += indent;
-        }
-        x += node.closeTag() + '\n';
-        return x;
       }
 
       //////////////////////////////////////////////////////////////////////////
@@ -381,7 +225,6 @@
         // TODO: Introduce concept of MultiSportSession?
         for (var i = 0; i < node.childNodes.length; i++) {
           var child = node.childNodes[i];
-          console.log(child);
           if (child.tagName == 'Activity') {
             this.maybeAddActivity_(child);
           } else if (child.tagName == 'MultiSportSession') {
@@ -464,9 +307,9 @@
         this.rebuildDom();
       };
       Activities.prototype.toXml = function() {
-        var node = new Node('Activities');
+        var node = document.createElementNS(null, 'Activities');
         for (var i = 0; i < this.activities_.length; i++) {
-          node.childNodes.push(this.activities_[i].toXml());
+          node.appendChild(this.activities_[i].toXml());
         }
         return node;
       };
@@ -655,11 +498,11 @@
         this.rebuildDom();
       };
       Activity.prototype.toXml = function() {
-        var node = new Node('Activity');
+        var node = document.createElementNS(null, 'Activity');
         node.setAttribute('Sport', this.sport_);
-        node.childNodes.push(new Node('Id', this.id_));
+        node.appendChild(createTextElement('Id', this.id_));
         for (var i = 0; i < this.laps_.length; i++) {
-          node.childNodes.push(this.laps_[i].toXml());
+          node.appendChild(this.laps_[i].toXml());
         }
         return node;
       };
@@ -909,14 +752,14 @@
         return result;
       }
       Lap.prototype.toXml = function() {
-        var node = new Node('Lap');
+        var node = document.createElementNS(null, 'Lap');
         node.setAttribute('StartTime', this.startTime_);
-        node.childNodes.push(new Node('TotalTimeSeconds', this.totalTimeSeconds_));
-        node.childNodes.push(new Node('DistanceMeters', this.distanceMeters_));
-        node.childNodes.push(new Node('MaximumSpeed', this.maximumSpeed_));
-        node.childNodes.push(new Node('Calories', this.calories_));
+        node.appendChild(createTextElement('TotalTimeSeconds', this.totalTimeSeconds_));
+        node.appendChild(createTextElement('DistanceMeters', this.distanceMeters_));
+        node.appendChild(createTextElement('MaximumSpeed', this.maximumSpeed_));
+        node.appendChild(createTextElement('Calories', this.calories_));
         for (var i = 0; i < this.tracks_.length; i++) {
-          node.childNodes.push(this.tracks_[i].toXml());
+          node.appendChild(this.tracks_[i].toXml());
         }
         return node;
       };
@@ -1026,9 +869,9 @@
         }
       }
       Track.prototype.toXml = function() {
-        var node = new Node('Track');
+        var node = document.createElementNS(null, 'Track');
         for (var i = 0; i < this.trackpoints_.length; i++) {
-          node.childNodes.push(this.trackpoints_[i].toXml());
+          node.appendChild(this.trackpoints_[i].toXml());
         }
         return node;
       };
@@ -1049,15 +892,15 @@
         this.distanceMeters_ = Number(node.getElementsByTagName('DistanceMeters')[0].textContent).valueOf();
       };
       Trackpoint.prototype.toXml = function() {
-        var node = new Node('Trackpoint');
-        node.childNodes.push(new Node('Time', this.time_));
+        var node = document.createElementNS(null, 'Trackpoint');
+        node.appendChild(createTextElement('Time', this.time_));
         if (!this.isTimeOnly_) {
-          var position = new Node('Position');
-          position.childNodes.push(new Node('LatitudeDegrees', this.latitudeDegrees_));
-          position.childNodes.push(new Node('LongitudeDegrees', this.longitudeDegrees_));
-          node.childNodes.push(position);
-          node.childNodes.push(new Node('AltitudeMeters', this.altitudeMeters_));
-          node.childNodes.push(new Node('DistanceMeters', this.distanceMeters_));
+          var position = document.createElementNS(null, 'Position');
+          position.appendChild(createTextElement('LatitudeDegrees', this.latitudeDegrees_));
+          position.appendChild(createTextElement('LongitudeDegrees', this.longitudeDegrees_));
+          node.appendChild(position);
+          node.appendChild(createTextElement('AltitudeMeters', this.altitudeMeters_));
+          node.appendChild(createTextElement('DistanceMeters', this.distanceMeters_));
         }
         return node;
       };
