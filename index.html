@@ -1,70 +1,827 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Tracklog editor</title>
     <script type="text/javascript">
-      function load() {
-        console.log('load()');
-        var file = document.getElementById('file').files[0];
-        if (!file) {
-          console.log('No file');
-          return;
+      // TODO:
+      // - Recalc maximum speed
+      // - Write to file with file API?
+
+      //////////////////////////////////////////////////////////////////////////
+      // Globals
+      var activities;
+      var LAB = '<';
+      var RAB = '>';
+
+      //////////////////////////////////////////////////////////////////////////
+      // Helpers
+      function timeDifferenceSeconds(start, end) {
+        return (new Date(end.time_) - new Date(start.time_)) / 1000;
+      }
+      // Estimates the displacement between two waypoints based on their
+      // lat/lng, not their distance field. Used for estimating displacement
+      // between the end of one track/lap/activity and the start of the next.
+        function estimateDisplacementMeters(start, end) {
+        var deltaLatitude = (end.latitudeDegrees_ - start.latitudeDegrees_);
+        var scaleFactor = Math.sin((end.latitudeDegrees_ + start.latitudeDegrees_) / 2 * Math.PI / 180);
+        var deltaLongitude = (end.longitudeDegrees_ - start.longitudeDegrees_) * scaleFactor;
+        return Math.pow(Math.pow(deltaLatitude, 2) + Math.pow(deltaLongitude, 2), 0.5) * 60 * 1852;
+      }
+      function toHourMinSec(secs) {
+        var hours = Math.floor(secs / (60 * 60));
+        secs = Math.abs(secs % (60 * 60));
+        var mins = Math.floor(secs / 60);
+        secs = Math.floor(secs % 60);
+        return hours + ':' + mins + ':' + secs;
+      }
+      function removeIndex(array, index) {
+        if (index < 0 || index >= array.length) {
+          throw new Error('Can not remove index ' + index);
         }
+        for (var i = index; i < array.length - 1; i++) {
+          array[i] = array[i + 1];
+        }
+        delete array[array.length - 1];
+        array.length--;
+      }
+      // Removes from s everything up to and including the first ocurrence of string str
+      function trimLeft(s, str) {
+        var i = s.indexOf(str);
+        return s.substr(i + str.length);
+      }
+      // Removes from s the first ocurrence of string str and everything following
+      function trimRight(s, str) {
+        return s.split(str)[0];
+      }
+      function createDiv(className) {
+        var div = document.createElement('div');
+        div.className = className;
+        return div;
+      }
+      function createButton(text, onclick) {
+        var div = document.createElement('button');
+        div.innerText = text;
+        if (onclick != undefined) {
+          div.onclick = onclick;
+        }
+        return div;
+      }
+      function createTextSpan(text) {
+        var div = document.createElement('span');
+        div.innerText = text;
+        return div;
+      }
+      function createTableRow(heading, data) {
+        var th = document.createElement('th');
+        th.innerText = heading;
+        var tr = document.createElement('tr');
+        tr.appendChild(th);
+        for (var i = 0; i < data.length; i++) {
+          var td = document.createElement('td');
+          td.innerText = data[i];
+          tr.appendChild(td);
+        }
+        return tr;
+      }
+      function createListItem(text) {
+        var li = document.createElement('li');
+        li.innerText = text;
+        return li;
+      }
+
+      //////////////////////////////////////////////////////////////////////////
+      // File loading
+      function load() {
+        var file = document.getElementById('datafile').files[0];
+        if (!file) {
+          throw new Error('No file');
+        }
+        console.log('File name: ' + file.name);
         var reader = new FileReader();
-
-        // Read file into memory as UTF-16      
-        reader.readAsText(file);
-
-        // Handle progress, success, and errors
-        reader.onloadstart = function() { console.log('readstart'); };
-        reader.onprogress = updateProgress;
+        reader.readAsText(file, "UTF-8");
+	// No need for load progress updates, as even large files are quick to
+	// load compared ot parsing.
         reader.onload = loaded;
         reader.onerror = errorHandler;
-        console.log('done');
       }
-      function updateProgress(evt) {
-        if (evt.lengthComputable) {
-          // evt.loaded and evt.total are ProgressEvent properties
-          var loaded = (evt.loaded / evt.total);
-          console.log('updateProgress(): ' + loaded + '%');
+      function loaded(evt) {
+        document.getElementById('progress').innerText = 'Parsing ...';
+        var fileString = evt.target.result;
+        setTimeout(function() { parse(fileString); }, 0);
+      }
+      function parse(fileString) {
+        if (fileString.indexOf('<?xml') != 0) {
+          return;
+        }
+        fileString = trimLeft(fileString, '>');
+        var node = new Node(new Stream(fileString));
+        document.getElementById('progress').innerText = 'Converting ...';
+        setTimeout(function() { convert(node); }, 0);
+      }
+      function convert(node) {
+        // Convert to our format
+        activities = new Activities(node.childAt(0));
+
+        // Display
+        var display = document.getElementById('display');
+        display.innerHTML = '';
+        display.appendChild(activities.dom_);
+        document.getElementById('progress').innerText = 'Done';
+      }
+      function errorHandler(evt) {
+        console.log(evt);
+      }
+
+      //////////////////////////////////////////////////////////////////////////
+      // Dumping
+      function dump() {
+        // TODO: Remove this and use a different printer to generate just raw data
+        //console.log(activities.print('', '  '));
+
+        var xml = new Node('TrainingCenterDatabase');
+        xml.children_.push(activities.toXml());
+        //console.log(printNode(xml));
+        var str = printNode(xml);
+        document.getElementById('dumpLink').href = 'data:text/xml,' + str;
+
+        // This is slow and not needed
+        // TODO ?! replaceAll()?
+        //pretty = str;
+        //while (pretty.indexOf('<') >= 0) {
+          //pretty = pretty.replace('<', '&lt');
+        //}
+        //document.getElementById('dump').innerHTML = pretty;
+      }
+
+      //////////////////////////////////////////////////////////////////////////
+      // Stream - Exists so a function passed a Stream can advance the start pos
+      Stream = function(str) {
+        this.str_ = str;
+      };
+      Stream.prototype.advancePast = function(x) {
+        this.str_ = trimLeft(this.str_, x);
+      };
+      Stream.prototype.trim = function() {
+        this.str_ = this.str_.trim();
+      };
+      Stream.prototype.string = function() {
+        return this.str_;
+      };
+
+      //////////////////////////////////////////////////////////////////////////
+      // Node
+      Node = function(arg1, arg2) {
+        this.children_ = [];
+        this.params_ = [];
+        if (typeof arg1 == 'string') {
+          this.tag_ = arg1;
+          this.data_ = arg2;
+        } else if (arg1 instanceof Stream) {
+          this.fromStream(arg1);
+        }
+      };
+      // Creates a Node from the stream. Ignores cruft in the stream after the end tag.
+      Node.prototype.fromStream = function(stream) {
+        // Later code assumes no whitespace between tags
+        stream.trim();
+        if (stream.string().charAt(0) != LAB) {
+          throw new Error('Must start with left angle brace');
+        }
+        stream.advancePast(LAB);
+        // Handle params
+        var tagAndParams = trimRight(stream.string(), RAB);
+        var params = tagAndParams.split(' ');
+        this.tag_ = params[0];
+        this.params_ = [];
+        for (var i = 1; i < params.length; i++) {
+          var x = params[i].split('=');
+          if (x.length == 2) {
+            this.params_[x[0]] = x[1].substr(1, x[1].length - 2);
+          }
+        }
+        //console.log('Node(): tag_ = ' + this.tag_);
+        stream.advancePast(RAB);
+        stream.trim();
+        // Error check
+        if (this.tag_.charAt(0) == '/') {
+          throw new Error('Unexpected close tag');
+        }
+        // If the next character in the stream is a left angle brace, but doesn't start an end node, it must be child nodes
+        if (stream.string().charAt(0) == LAB && stream.string().charAt(1) != '/') {
+          var bail = 10000;
+          while (bail > 0) {
+            //console.log('Looping: stream = ' + stream.string());
+            if (stream.string().charAt(0) != LAB) {
+              throw new Error('Must start with left angle brace');
+            }
+            // If the next tag is a close tag, bail
+            // TODO: could we eliminate the search here by trimming the whitespace?
+            if (stream.string().charAt(stream.string().indexOf(LAB) + 1) == '/') {
+              //console.log('Got close tag for ' + this.tag_ + ', breaking');
+              break;
+            }
+            // Otherwise, assume it's a well-formed tag and create a new Node
+            this.children_.push(new Node(stream));
+            bail--;
+          }
+        } else {
+          // Otherwise read data. This may be the empty string.
+          this.data_ = trimRight(stream.string(), LAB);
+          //console.log('Got data: ' + this.data_);
+        }
+        stream.advancePast(this.closeTag());
+        stream.trim();
+        //console.log('Node(): Done: tag_ = ' + this.tag_);
+      };
+      Node.prototype.numChildren = function() {
+        return this.children_.length;
+      };
+      Node.prototype.childAt = function(i) {
+        return this.children_[i];
+      };
+      Node.prototype.openTag = function() {
+        var str = LAB + this.tag_;
+        for (var i in this.params_) {
+          str += ' ' + i + '=\'' + this.params_[i] + '\'';
+        }
+        return str + RAB;
+      };
+      Node.prototype.closeTag = function() {
+        return LAB + '/' + this.tag_ + RAB;
+      };
+      Node.prototype.firstChildOfType = function(type) {
+        for (var i = 0; i < this.children_.length; i++) {
+          if (this.children_[i].tag_ == type) {
+            return this.children_[i];
+          }
+        }
+        return null;
+      };
+
+      //////////////////////////////////////////////////////////////////////////
+      // Printer
+      function printNode(node, depth) {
+        var increment = '  ';
+        if (depth == undefined) {
+          depth = 0;
+        }
+        var indent = '';
+        for (var i = 0; i < depth; i++) {
+          indent += increment;
+        }
+        x = indent + node.openTag();
+        if (node.numChildren() == 0) {
+          x += node.data_;
+        } else {
+          x += '\n';
+          for (var i = 0; i < node.numChildren(); i++) {
+            x += printNode(node.childAt(i), depth + 1);
+          }
+          x += indent;
+        }
+        x += node.closeTag() + '\n';
+        return x;
+      }
+
+      //////////////////////////////////////////////////////////////////////////
+      // Activities
+      Activities = function(node) {
+        this.activities_ = [];
+        // All children are type Activity
+        for (var i = 0; i < node.numChildren(); i++) {
+          this.activities_.push(new Activity(node.childAt(i)));
+        }
+        this.dom_ = createDiv('activities wide');
+        this.rebuildDom();
+      };
+      Activities.prototype.rebuildDom = function() {
+        this.dom_.innerHTML = '';
+        for (var i = 0; i < this.activities_.length; i++) {
+          // Activity
+          var div = createDiv('activity wide');
+          div.appendChild(createTextSpan('Activity ' + (i + 1) + ' of ' + this.activities_.length));
+          if (this.activities_.length > 1) {
+            div.appendChild(createButton(
+                'Remove',
+                (function(me, j) { return function() { me.removeActivity(j); }; })(this, i)));
+          }
+          this.activities_[i].rebuildDom();
+          div.appendChild(this.activities_[i].dom_);
+          this.dom_.appendChild(div);
+          // Collapser
+          if (i == this.activities_.length - 1) {
+            continue;
+          }
+          var start = this.activities_[i].lastLap().lastTrack().lastTrackpoint();
+          var end = this.activities_[i + 1].firstLap().firstTrack().firstTrackpoint();
+          var time = timeDifferenceSeconds(start, end);
+          var displacement = estimateDisplacementMeters(start, end);
+          var collapser = createDiv('activity wide collapser');
+          collapser.appendChild(createButton('Collapse Activities ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseActivityWithPrevious(j); }; })(this, i + 1)));
+          var table = document.createElement('table');
+          table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(time)]));
+          table.appendChild(createTableRow('Approximate displacement (km)', [displacement / 1000]));
+          collapser.appendChild(table);
+          this.dom_.appendChild(collapser);
+        }
+      };
+      Activities.prototype.removeActivity = function(index) {
+	// Removing an activitiy is easy, because the activity has no metadata.
+	// The laps from this activity therefore remain independent of the laps
+	// from the previous activity and no modification is required.
+        console.log('Removing activity ' + index);
+        removeIndex(this.activities_, index);
+        this.rebuildDom();
+      };
+      Activities.prototype.collapseActivityWithPrevious = function(index) {
+        if (index == 0 || index >= this.activities_.length) {
+          throw new Error('Can not collapse index ' + index);
+        }
+        console.log('Collapsing activity ' + (index + 1) + ' with activity ' + index);
+        var thisActivity = this.activities_[index];
+        var previousActivity = this.activities_[index - 1];
+	// Collapsing activities is easy, because the activity has no metadata.
+	// The laps from this activity therefore remain independent of the laps
+	// from the previous activity and no modification is required.
+        for (var i = 0; i < thisActivity.laps_.length; i++) {
+          previousActivity.laps_.push(thisActivity.laps_[i]);
+        }
+        for (var i = index; i < this.activities_.length - 1; i++) {
+          this.activities_[i] = this.activities_[i + 1];
+        }
+        delete this.activities_[this.activities_.length - 1];
+        this.activities_.length--;
+        this.rebuildDom();
+      };
+      Activities.prototype.print = function(indent, increment) {
+        var str = '';
+        for (var i = 0; i < this.activities_.length; i++) {
+          str += indent + 'Activity ' + (i + 1) + '\t:\n';
+          str += this.activities_[i].print(indent + increment, increment);
+        }
+        return str;
+      };
+      Activities.prototype.toXml = function() {
+        var node = new Node('Activities');
+        for (var i = 0; i < this.activities_.length; i++) {
+          node.children_.push(this.activities_[i].toXml());
+        }
+        return node;
+      };
+
+      //////////////////////////////////////////////////////////////////////////
+      // Activity
+      Activity = function(node) {
+        this.sport_ = node.params_['Sport'];
+        this.id_ = node.firstChildOfType('Id').data_;
+        this.laps_ = [];
+        for (var i = 0; i < node.numChildren(); i++) {
+          if (node.childAt(i).tag_ == 'Lap') {
+            this.laps_.push(new Lap(node.childAt(i)));
+          }
+        }
+        this.dom_ = createDiv('');
+        this.rebuildDom();
+      };
+      Activity.prototype.firstLap = function() {
+        return this.laps_[0];
+      }
+      Activity.prototype.lastLap = function() {
+        return this.laps_[this.laps_.length - 1];
+      }
+      Activity.prototype.rebuildDom = function() {
+        this.dom_.innerHTML = '';
+        this.dom_.appendChild(createTextSpan('Sport'));
+        var sport = document.createElement('input');
+        sport.value = this.sport_;
+        sport.onchange = (function(activity) { return function() { activity.sport_ = this.value; }; })(this);
+        this.dom_.appendChild(sport);
+        this.dom_.appendChild(createTextSpan('Id'));
+        var id = document.createElement('input');
+        id.value = this.id_;
+        id.size = 50;
+        id.onchange = (function(activity) { return function() { activity.id_ = this.value; }; })(this);
+        this.dom_.appendChild(id);
+        for (var i = 0; i < this.laps_.length; i++) {
+          // Lap
+          var div = createDiv('lap wide');
+          div.appendChild(createTextSpan('Lap ' + (i + 1) + ' of ' + this.laps_.length));
+          if (this.laps_.length > 1) {
+            div.appendChild(createButton(
+                'Remove',
+                (function(me, j) { return function() { me.removeLap(j); }; })(this, i)));
+          }
+          this.laps_[i].rebuildDom();
+          div.appendChild(this.laps_[i].dom_);
+          this.dom_.appendChild(div);
+          // Collapser
+          if (i == this.laps_.length - 1) {
+            continue;
+          }
+          var start = this.laps_[i].lastTrack().lastTrackpoint();
+          var end = this.laps_[i + 1].firstTrack().firstTrackpoint();
+          var time = timeDifferenceSeconds(start, end);
+          var displacement = estimateDisplacementMeters(start, end);
+          var collapser = createDiv('lap wide collapser');
+          collapser.appendChild(createButton('Collapse Laps ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseLapWithPrevious(j); }; })(this, i + 1)));
+          var table = document.createElement('table');
+          table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(time)]));
+          table.appendChild(createTableRow('Approximate displacement (km)', [displacement / 1000]));
+          collapser.appendChild(table);
+          this.dom_.appendChild(collapser);
+        }
+      };
+      Activity.prototype.removeLap = function(index) {
+	// Removing a lap is easy, because it's independent of other laps, so
+	// nothing needs updating.
+        console.log('Removing lap ' + index);
+        removeIndex(this.laps_, index);
+        this.rebuildDom();
+      };
+      Activity.prototype.collapseLapWithPrevious = function(index) {
+        if (index == 0 || index >= this.laps_.length) {
+          throw new Error('Can not collapse index ' + index);
+        }
+        console.log('Collapsing lap ' + (index + 1) + ' with lap ' + index);
+        var thisLap = this.laps_[index];
+        var previousLap = this.laps_[index - 1];
+	// We need to update the tracks from this lap so that their distances
+	// are continuous with those of the previous lap.
+        for (var i = 0; i < thisLap.tracks_.length; i++) {
+          console.log('Shifting track ' + (i + 1) + ' by distance ' + previousLap.distanceMeters_);
+          thisLap.tracks_[i].shiftDistances(previousLap.distanceMeters_);
+          previousLap.tracks_.push(thisLap.tracks_[i]);
+        }
+        previousLap.updateMetadata();
+        // TODO: max speed should be part of updateMetadata.
+        previousLap.maximumSpeed_ = Math.max(thisLap.maximumSpeed_, previousLap.maximumSpeed_);
+        // Calories can't be calculated from the tracks, so we do it manually here.
+        previousLap.calories_ += thisLap.calories_;
+        removeIndex(this.laps_, index);
+        this.rebuildDom();
+      };
+      Activity.prototype.print = function(indent, increment) {
+        var str = '';
+        for (var i = 0; i < this.laps_.length; i++) {
+          str += indent + 'Lap ' + (i + 1) + '\t:\n';
+          str += this.laps_[i].print(indent + increment, increment);
+        }
+        return str;
+      };
+      Activity.prototype.toXml = function() {
+        var node = new Node('Activity');
+        node.params_['Sport'] = this.sport_;
+        node.children_.push(new Node('Id', this.id_));
+        for (var i = 0; i < this.laps_.length; i++) {
+          node.children_.push(this.laps_[i].toXml());
+        }
+        return node;
+      };
+
+      //////////////////////////////////////////////////////////////////////////
+      // Lap
+      Lap = function(node) {
+        // Metadata
+        this.startTime_ = node.params_['StartTime'];
+        this.totalTimeSeconds_ = Number(node.firstChildOfType('TotalTimeSeconds').data_).valueOf();
+        this.distanceMeters_ = Number(node.firstChildOfType('DistanceMeters').data_).valueOf();
+        this.maximumSpeed_ = Number(node.firstChildOfType('MaximumSpeed').data_).valueOf();
+        this.calories_ = Number(node.firstChildOfType('Calories').data_).valueOf();
+        this.tracks_ = [];
+        for (var i = 0; i < node.numChildren(); i++) {
+          if (node.childAt(i).tag_ == 'Track') {
+            this.tracks_.push(new Track(node.childAt(i)));
+            var count = this.tracks_.length;
+          }
+        }
+        this.dom_ = createDiv('');
+        this.rebuildDom();
+      };
+      Lap.prototype.firstTrack = function() {
+        return this.tracks_[0];
+      }
+      Lap.prototype.lastTrack = function() {
+        return this.tracks_[this.tracks_.length - 1];
+      }
+      Lap.prototype.rebuildDom = function() {
+        this.dom_.innerHTML = '';
+        var table = document.createElement('table');
+        table.appendChild(createTableRow('Start time', [this.startTime_]));
+        table.appendChild(createTableRow('Total time (HH:MM:SS)', [toHourMinSec(this.totalTimeSeconds_)]));
+        table.appendChild(createTableRow('Distance (km)', [this.distanceMeters_ / 1000]));
+        table.appendChild(createTableRow('Maximum speed (m/s)', [this.maximumSpeed_]));
+        table.appendChild(createTableRow('Calories', [this.calories_]));
+        this.dom_.appendChild(table);
+        var errors = [];
+        if (!this.isConsistent(errors)) {
+          var div = createDiv('errors');
+          div.appendChild(createTextSpan('Inconsistencies detected'));
+          div.appendChild(createButton(
+              'Fix',
+              (function(me) { return function() { me.fixInconsistencies(); }; })(this)));
+          var ul = document.createElement('ul');
+          for (var i = 0; i < errors.length; i++) {
+            ul.appendChild(createListItem(errors[i]));
+          }
+          div.appendChild(ul);
+          this.dom_.appendChild(div);
+        }
+        for (var i = 0; i < this.tracks_.length; i++) {
+          // Track
+          var div = createDiv('track wide');
+          div.appendChild(createTextSpan('Track ' + (i + 1) +' of ' + this.tracks_.length));
+          if (this.tracks_.length > 1) {
+            div.appendChild(createButton(
+                'Remove',
+                (function(me, j) { return function() { me.removeTrack(j); }; })(this, i)));
+          }
+          this.tracks_[i].rebuildDom();
+          div.appendChild(this.tracks_[i].dom_);
+          this.dom_.appendChild(div);
+          // Collapser
+          if (i == this.tracks_.length - 1) {
+            continue;
+          }
+          var start = this.tracks_[i].lastTrackpoint();
+          var end = this.tracks_[i + 1].firstTrackpoint();
+          var time = timeDifferenceSeconds(start, end);
+          var displacement = estimateDisplacementMeters(start, end);
+          var collapser = createDiv('track wide collapser');
+          collapser.appendChild(createButton(
+              'Collapse Tracks ' + (i + 1) + ' and ' + (i + 2),
+              (function(me, j) { return function() { me.collapseTrackWithPrevious(j); }; })(this, i + 1)));
+          var table = document.createElement('table');
+          table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(time)]));
+          table.appendChild(createTableRow('Approximate displacement (km)', [displacement / 1000]));
+          collapser.appendChild(table);
+          this.dom_.appendChild(collapser);
+        }
+      };
+      Lap.prototype.removeTrack = function(index) {
+        console.log('Removing track ' + index);
+	// When removing a track, we need to shift the distances of all later
+	// tracks and update the time and distance for the lap.
+        var distance = this.tracks_[index].firstTrackpoint().distanceMeters_ -
+            this.tracks_[index].lastTrackpoint().distanceMeters_;
+        for (var i = index + 1; i < this.tracks_.length; i++) {
+          console.log('Shifting track ' + (i + 1) + ' by ' + distance);
+          this.tracks_[i].shiftDistances(distance);
+        }
+        removeIndex(this.tracks_, index);
+        this.updateMetadata();
+        // TODO: Make an estimate of how to update calories?
+        this.rebuildDom();
+      };
+      Lap.prototype.collapseTrackWithPrevious = function(index) {
+        if (index == 0 || index >= this.tracks_.length) {
+          throw new Error('Can not collapse index ' + index);
+        }
+        console.log('Collapsing track ' + (index + 1) + ' with track ' + index);
+        var thisTrack = this.tracks_[index];
+        var previousTrack = this.tracks_[index - 1];
+	// When collapsing tracks, we need to account for the time and distance
+	// between them. This means shifting the distances of this and all
+	// later tracks and updating the time and distance for the lap.
+        var start = previousTrack.lastTrackpoint();
+        var end = thisTrack.firstTrackpoint();
+        var time = timeDifferenceSeconds(start, end);
+        var displacement = estimateDisplacementMeters(start, end);
+        for (var i = index; i < this.tracks_.length; i++) {
+          console.log('Shifting track ' + (i + 1) + ' by distance ' + displacement);
+          this.tracks_[i].shiftDistances(displacement);
+        }
+        // Now do the merge.
+        for (var i = 0; i < thisTrack.trackpoints_.length; i++) {
+          previousTrack.trackpoints_.push(thisTrack.trackpoints_[i]);
+        }
+        removeIndex(this.tracks_, index);
+        this.updateMetadata();
+        this.rebuildDom();
+      }
+      // Updates the start time, time and distance metadata from the tracks.
+      // TODO: Calculate maximum speed
+      Lap.prototype.updateMetadata = function() {
+        this.startTime_ = this.firstTrack().firstTrackpoint().time_;
+        this.totalTimeSeconds_ = this.calculateTotalTime();
+        this.distanceMeters_ = this.calculateDistance();
+      }
+      Lap.prototype.calculateTotalTime = function() {
+        var res = 0;
+        for (var i = 0; i < this.tracks_.length; i++) {
+          res += timeDifferenceSeconds(this.tracks_[i].firstTrackpoint(),
+                                       this.tracks_[i].lastTrackpoint());
+        }
+        return res;
+      }
+      Lap.prototype.calculateDistance = function() {
+	// This will be correct even if the first track does not start at
+	// distance zero.
+        return this.lastTrack().lastTrackpoint().distanceMeters_ -
+            this.firstTrack().firstTrackpoint().distanceMeters_;
+      };
+      Lap.prototype.fixInconsistencies = function() {
+        var offset = - this.firstTrack().firstTrackpoint().distanceMeters_;
+        this.firstTrack().shiftDistances(offset);
+        for (var i = 1; i < this.tracks_.length; i++) {
+          var offset = this.tracks_[i - 1].lastTrackpoint().distanceMeters_ -
+              this.tracks_[i].firstTrackpoint().distanceMeters_;
+          console.log('Shifting track ' + (i + 1) + ' by distance ' + offset);
+          this.tracks_[i].shiftDistances(offset);
+        }
+        // This must be done after fixing the tracks.
+        this.updateMetadata();
+        this.rebuildDom();
+      }
+      Lap.prototype.isConsistent = function(errorMessages) {
+        var result = true;
+        // Check metadata
+        if (this.startTime_ != this.firstTrack().firstTrackpoint().time_) {
+          errorMessages.push('Start time inconsistent');
+          result = false;
+        }
+        // Total time field decimals, but time stamps do not.
+        if (Math.abs(this.totalTimeSeconds_ - this.calculateTotalTime()) > 0.5) {
+          errorMessages.push('Total time inconsistent');
+          result = false;
+        }
+        if (this.distanceMeters_ != this.calculateDistance()) {
+          errorMessages.push('Distance inconsistent');
+          result = false;
+        }
+        // TODO: Check maximum speed
+        // Check distances are continuous
+        if (this.firstTrack().firstTrackpoint().distanceMeters_ != 0) {
+          errorMessages.push('First track does not start at distance zero');
+          result = false;
+        }
+        for (var i = 1; i < this.tracks_.length; i++) {
+          if (this.tracks_[i - 1].lastTrackpoint().distanceMeters_ !=
+              this.tracks_[i].firstTrackpoint().distanceMeters_) {
+            errorMessages.push('Distance discrepancy between tracks ' + i + ' and ' + (i + 1));
+            result = false;
+          }
+        }
+        return result;
+      }
+      Lap.prototype.print = function(indent, increment) {
+        var str = '';
+        for (var i = 0; i < this.tracks_.length; i++) {
+          str += indent + 'Track ' + (i + 1) + '\t:\n';
+          str += this.tracks_[i].print(indent + increment, increment);
+        }
+        return str;
+      };
+      Lap.prototype.toXml = function() {
+        var node = new Node('Lap');
+        node.params_['StartTime'] = this.startTime_;
+        node.children_.push(new Node('TotalTimeSeconds', this.totalTimeSeconds_));
+        node.children_.push(new Node('DistanceMeters', this.distanceMeters_));
+        node.children_.push(new Node('MaximumSpeed', this.maximumSpeed_));
+        node.children_.push(new Node('Calories', this.calories_));
+        for (var i = 0; i < this.tracks_.length; i++) {
+          node.children_.push(this.tracks_[i].toXml());
+        }
+        return node;
+      };
+
+      //////////////////////////////////////////////////////////////////////////
+      // Track
+      Track = function(node) {
+        this.trackpoints_ = [];
+        // No metadata and all children are type Trackpoint
+        for (var i = 0; i < node.numChildren(); i++) {
+          var trackpoint = node.childAt(i);
+          if (trackpoint.numChildren() > 1) {
+            this.trackpoints_.push(new Trackpoint(trackpoint));
+          }
+        }
+        this.dom_ = document.createElement('table');
+        this.rebuildDom();
+      };
+      Track.prototype.firstTrackpoint = function() {
+        return this.trackpoints_[0];
+      }
+      Track.prototype.lastTrackpoint = function() {
+        return this.trackpoints_[this.trackpoints_.length - 1];
+      }
+      Track.prototype.rebuildDom = function() {
+        this.dom_.innerHTML = '';
+        var first = this.firstTrackpoint();
+        var last = this.lastTrackpoint();
+        this.dom_.appendChild(createTableRow('Num trackpoints', [this.trackpoints_.length]));
+        this.dom_.appendChild(createTableRow('Start/End time', [first.time_, last.time_]));
+        this.dom_.appendChild(createTableRow('Start/End distance (km)', [first.distanceMeters_ / 1000, last.distanceMeters_ / 1000]));
+        this.dom_.appendChild(createTableRow('Start/End altitude (m)', [first.altitudeMeters_, last.altitudeMeters_]));
+        this.dom_.appendChild(createTableRow('Start/End latitude (deg)', [first.latitudeDegrees_, last.latitudeDegrees_]));
+        this.dom_.appendChild(createTableRow('Start/End longitude (deg)', [first.longitudeDegrees_, last.longitudeDegrees_]));
+      };
+      Track.prototype.shiftDistances = function(delta) {
+        for (var i = 0; i < this.trackpoints_.length; i++) {
+          this.trackpoints_[i].distanceMeters_ += delta;
         }
       }
-      function loaded(evt) {  
-        txt = evt.target.result;
-        parser = new DOMParser();
-        xmlDoc = parser.parseFromString(txt, "text/xml");
-        console.log(xmlDoc);
-        // TODO: Hanlde multiple activities
-        activity = xmlDoc.getElementsByTagName('Activity')[0];
-        laps = activity.getElementsByTagName('Lap');
-        // TODO: Can a lap have multiple tracks?
-        route = document.getElementById('route');
-        for (i = 0; i < laps.length; i++) {
-          lap = laps[i];
-          trackpoints = lap.getElementsByTagName('Trackpoint');
-          lapElem = document.createElement('div');
-          lapElem.innerText = 'Lap ' + i;
-          trackpointsElem = document.createElement('div');
-          span = document.createElement('span');
-          span.innerText = trackpoints.length + ' trackpoints';
-          trackpointsElem.appendChild(span);
-          link = document.createElement('a');
-          link.innerText = 'expand';
-          trackpointsElem.appendChild(link);
-          lapElem.appendChild(trackpointsElem);
-          route.appendChild(lapElem);
+      Track.prototype.print = function(indent) {
+        var str = '';
+        for (var i = 0; i < this.trackpoints_.length; i++) {
+          str += indent + 'Trackpoint ' + (i + 1) + '\t: ';
+          str += this.trackpoints_[i].print() + '\n';
         }
-      }
-      function errorHandler(evt) {  
-        console.log('errorHandler()');
-      }
+        return str;
+      };
+      Track.prototype.toXml = function() {
+        var node = new Node('Track');
+        for (var i = 0; i < this.trackpoints_.length; i++) {
+          node.children_.push(this.trackpoints_[i].toXml());
+        }
+        return node;
+      };
+
+      //////////////////////////////////////////////////////////////////////////
+      // Trackpoint
+      Trackpoint = function(node) {
+        this.time_ = node.firstChildOfType('Time').data_;
+        var position = node.firstChildOfType('Position');
+        this.latitudeDegrees_ = Number(position.firstChildOfType('LatitudeDegrees').data_).valueOf();
+        this.longitudeDegrees_ = Number(position.firstChildOfType('LongitudeDegrees').data_).valueOf();
+        this.altitudeMeters_ = Number(node.firstChildOfType('AltitudeMeters').data_).valueOf();
+        this.distanceMeters_ = Number(node.firstChildOfType('DistanceMeters').data_).valueOf();
+      };
+      Trackpoint.prototype.print = function() {
+        return this.time_ + '\t' + this.distanceMeters_ + '\t' + this.altitudeMeters_;
+      };
+      Trackpoint.prototype.toXml = function() {
+        var node = new Node('Trackpoint');
+        node.children_.push(new Node('Time', this.time_));
+        var position = new Node('Position');
+        position.children_.push(new Node('LatitudeDegrees', this.latitudeDegrees_));
+        position.children_.push(new Node('LongitudeDegrees', this.longitudeDegrees_));
+        node.children_.push(position);
+        node.children_.push(new Node('AltitudeMeters', this.altitudeMeters_));
+        node.children_.push(new Node('DistanceMeters', this.distanceMeters_));
+        return node;
+      };
     </script>
+    <style type="text/css">
+      div.wide {
+        margin: 4px;
+        padding: 4px;
+      }
+      div.activities {
+        border-color: red;
+        border-style: solid;
+      }
+      div.activity {
+        border-color: green;
+        border-style: solid;
+      }
+      div.lap {
+        border-color: blue;
+        border-style: solid;
+      }
+      div.track {
+        border-color: black;
+        border-style: solid;
+      }
+      div.collapser {
+        border-style: dashed;
+      }
+      table {
+        font-family: Courier;
+        font-size: small;
+      }
+      th {
+        text-align: left;
+      }
+      div#display {
+        float: left;
+        width: 700px;
+      }
+      pre#dump {
+        font-size: x-small;
+        margin-left: 700px;
+      }
+      span {
+        margin-right: 10px;
+      }
+      div.errors {
+        color: red;
+        border: 1px solid red;
+        margin: 4px;
+        padding: 4px;
+      }
+      div.errors ul {
+        margin: 0px;
+      }
+    </style>
   </head>
   <body>
-    <form>
-      GPX file<input id="file" type="file">
-      <p><a href="#" onclick="load()">load</a>
-    </form>
-    <div id="route"></div>
-  </body>
+    <div>
+      Data file:<input type="file" id="datafile">
+      <button onclick="load()">Load</button>
+      <span id="progress"></span>
+      <button onclick="dump()">Dump</button>
+    </div>
+    <div id="display"></div>
+    <div><a href="" id="dumpLink">download</a></div>
+    <pre id="dump"></pre>
+  <body>
 </html>
