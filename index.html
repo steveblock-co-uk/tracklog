@@ -3,21 +3,33 @@
   <head>
     <script type="text/javascript">
       // Behaviour
-      // - It seems app and website ignore tracks within a lap
+      // - It seems app and website ignore the distinction between multiple tracks within a lap
+      // - It seems all tracks have at least one trackpoint, but this may not have position data (see below).
+      // - Tracks are only written when the GPS has a fix. If the GPS looses
+      //   its fix, the track is terminated and a new one started when it regains
+      //   a fix. This means that a lap may contain zero tracks. Also, the sum of
+      //   the time ranges of the tracks in a lap may not match the lap time.
       // - Assume that each lap (and therefore activity) contains at least one track with position data.
       // - Pressing stop then start causes a new track to be started.
-      //   It seems the old track may be finished and the new track started with a time-only trackpoint, presumbaly to record a precise timestamp even when no position is available.
+      //   It seems the old track may be finished and the new track started
+      //   with a time-only trackpoint, presumbaly to record a precise
+      //   timestamp even when no position is available.
       // - Pressing lap while started causes a new lap to be started
       //   The above is true about the final and starting trackpoints. 
       // - Pressing lap while stopped causes a new lap to be started.
-      //   It seems the previous lap is always terminated with a dummy track in this case, with only a single time-only trackpoint. Not sure why this is. The dummy track is 1s before the start of the new lap.
+      //   It seems the previous lap is always terminated with a dummy track in
+      //   this case, with only a single time-only trackpoint. Not sure why
+      //   this is. The dummy track is 1s before the start of the new lap.
       // - Turning off then on while started causes a new track to be started (TODO: And lap?)
       // - Turning off then on while stopped also causes a new track to be started (TODO: And lap?)
       // - Turning off then on while stopped and after pressing lap causes a new lap to be started
-      //   The dummy track mentioned above seems to be written as part of the new lap in this case
+      //   The dummy track mentioned above seems to be written as part of the
+      //   new lap in this case
       // Weirdness
       // - There seems to be a condition where the lap distance doesn't match the track distances
-      // - There seems to be a condition where, when starting a new lap (perhaps when also turning off then on?), the previous lap is terminated with a track with two trackpoints, rather then 1.
+      // - There seems to be a condition where, when starting a new lap
+      //   (perhaps when also turning off then on?), the previous lap is
+      //   terminated with a track with two trackpoints, rather then 1.
       //   The second of which is 1s before the new lap as normal, but the first is 1s after the previous track.
       //   This messes up the total time for the lap.
       //   It can be fixed by deleting the lap.
@@ -27,10 +39,14 @@
       // - A lap can have at most one dummy (single time-only trackpoint) at each end
       // Plan
       // - No need to offer collapsing of tracks, as viewer ignores them anyway.
-      // - We should preserve the above. So when merging laps, we should remove dummy trackpoints at the merge point
+      // - We should preserve the above. So when merging laps, we should remove
+      //   dummy trackpoints at the merge point
 
       // TODOs
+      // - Update logic to not assume laps always have tracks?
+      // - Remove checking that track times start at lap start time and sum to lap time. Can also remove time shifting of tracks when merging laps?
       // - Bug with deleting first lap of shipAndSydney
+      // - Move work out of c'tor - see Lap.
       // - Update distance/time between laps/activities when deleting tracks/laps
       // - Show tracks on map
       // - Allow manual override of displacement for merging laps/activities - does this make sense?
@@ -349,6 +365,16 @@
         this.dom_ = createDiv('activities wide');
         this.dom_.innerHTML = 'No activities yet - load some!';
       };
+      // This is only reqquired because we currently allow empty laps
+      // TODO: Remove this.
+      Activities.prototype.maybeAddActivity_ = function(node) {
+        var activity = new Activity(node);
+        if (activity.laps_.length > 0) {
+          this.activities_.push(activity);
+        } else {
+          console.log('Skipping empty activity at start time ' + activity.startTime_);
+        }
+      };
       Activities.prototype.addFromXml = function(node) {
 	// Children may be Activity or MultiSportSession. For the latter, we
 	// just pull out the Activity objects.
@@ -356,17 +382,17 @@
         for (var i = 0; i < node.numChildren(); i++) {
           var child = node.childAt(i);
           if (child.tag_ == 'Activity') {
-            this.activities_.push(new Activity(child));
+            this.maybeAddActivity_(child);
           } else if (child.tag_ == 'MultiSportSession') {
             for (var j = 0; j < child.numChildren(); j++) {
               var grandChild = child.childAt(j);
               if (grandChild.tag_ == 'FirstSport' || grandChild.tag_ == 'NextSport') {
-                // There should only be a sing le child, of type Activity.
+                // There should only be a single child, of type Activity.
                 var greatGrandChild = grandChild.childAt(0);
                 if (greatGrandChild.tag_ != 'Activity') {
                   throw new Error('Unexpected tag \'' + greatGrandChild.tag_ + '\' in \'' + grandChild.tag_ + '\'');
                 }
-                this.activities_.push(new Activity(greatGrandChild));
+                this.maybeAddActivity_(greatGrandChild);
               }
             }
           } else {
@@ -452,11 +478,18 @@
         this.laps_ = [];
         for (var i = 0; i < node.numChildren(); i++) {
           if (node.childAt(i).tag_ == 'Lap') {
-            this.laps_.push(new Lap(this, node.childAt(i)));
+            // For now, skip laps with no GPS data (ie no tracks)
+            // TODO: Consider handling them.
+            var lap = new Lap(this, node.childAt(i));
+            if (lap.tracks_.length > 0) {
+              lap.rebuildDom()
+              this.laps_.push(lap);
+            } else {
+              console.log('Skipping empty lap with start time ' + lap.startTime_);
+            }
           }
         }
         this.dom_ = createDiv('');
-        this.rebuildDom();
       };
       Activity.prototype.shiftDistanceOfAllLaterLaps = function(lap, distance) {
         // TODO: Make this neater
@@ -647,7 +680,6 @@
           }
         }
         this.dom_ = createDiv('');
-        this.rebuildDom();
       };
       Lap.prototype.firstTrack = function() {
         if (this.tracks_.length < 1) {
@@ -836,6 +868,8 @@
       Lap.prototype.isConsistent = function(errorMessages) {
         var result = true;
         // Check metadata
+        // TODO: Remove these checks
+/*
         if (this.startTime_ != this.firstTrack().firstTrackpoint().time_) {
           errorMessages.push('Start time inconsistent: ' + this.startTime_ +
                              ' vs ' + this.firstTrack().firstTrackpoint().time_);
@@ -850,6 +884,7 @@
                              's vs ' + this.calculateTotalTime() + 's');
           result = false;
         }
+*/
         if (Math.abs(this.distanceMeters_ - this.calculateDistance()) > 0.1) {
           errorMessages.push('Distance inconsistent: ' + this.distanceMeters_ +
                              'm vs ' + this.calculateDistance() + 'm');
