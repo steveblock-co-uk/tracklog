@@ -21,6 +21,7 @@
       //   The second of which is 1s before the new lap as normal, but the first is 1s after the previous track.
       //   This messes up the total time for the lap.
       //   It can be fixed by deleting the lap.
+      // - It seems to be possible to end up with a dummy track with two trackpoints.
       // Conclusions
       // - A track can have at most one time-only trackpoints at each end
       // - A lap can have at most one dummy (single time-only trackpoint) at each end
@@ -29,8 +30,11 @@
       // - We should preserve the above. So when merging laps, we should remove dummy trackpoints at the merge point
 
       // TODOs
-      // - Add ability to merge multiple files
-      // - Allow manual override of displacement for merging laps/activities
+      // - Handle multisport
+      // - Bug with deleting first lap of shipAndSydney
+      // - Update distance/time between laps/activities when deleting tracks/laps
+      // - Show tracks on map
+      // - Allow manual override of displacement for merging laps/activities - does this make sense?
       // - Replace node with DOMParser builtin - see index.html.190612
       // - Add tests
       // - Recalc maximum speed
@@ -38,11 +42,17 @@
 
       //////////////////////////////////////////////////////////////////////////
       // Globals
-      var xml;
+      // The container for the currently loaded set of activities.
       var activities;
-      var trainingCenterDatabase;
+      // The XML currently being read in.
+      var xmlInput;
+      // The XML header. Cached from the first XML file we read.
+      var xmlHeader = null;
+      // The root node for the output XML. Cached from the first XML file we read.
+      var trainingCenterDatabase = null;
       var LAB = '<';
       var RAB = '>';
+      var MAX_CONSECUTIVE_TIME_ONLY_TRACKPOINTS = 2;
 
       //////////////////////////////////////////////////////////////////////////
       // Helpers
@@ -124,6 +134,13 @@
       }
 
       //////////////////////////////////////////////////////////////////////////
+      // Main
+      function OnLoad() {
+        activities = new Activities();
+        document.getElementById('display').appendChild(activities.dom_);
+      }
+
+      //////////////////////////////////////////////////////////////////////////
       // File loading
       function load() {
         var file = document.getElementById('datafile').files[0];
@@ -150,22 +167,29 @@
           return;
         }
         var i = fileString.indexOf('>');
-        xml = fileString.substr(0, i + 1);
+        if (xmlHeader == null) {
+          xmlHeader = fileString.substr(0, i + 1);
+        }
         fileString = fileString.substr(i + 1);
 
-        trainingCenterDatabase = new Node(new Stream(fileString));
+        inputXml = new Node(new Stream(fileString));
         document.getElementById('progress').innerText = 'Converting ...';
         setTimeout(function() { convert(); }, 0);
       }
       function convert() {
         // Convert to our format
-        activities = new Activities(trainingCenterDatabase.firstChildOfType('Activities'));
+        activities.addFromXml(inputXml.firstChildOfType('Activities'));
 
-        // Display
-        var display = document.getElementById('display');
-        display.innerHTML = '';
-        display.appendChild(activities.dom_);
+        // Cache root node for use in output.
+        if (trainingCenterDatabase == null) {
+          trainingCenterDatabase = inputXml;
+          trainingCenterDatabase.children_ = [];
+        }
         document.getElementById('progress').innerText = 'Done';
+        setTimeout(function() {
+          document.getElementById('progress').innerText = 'Ready';
+          document.getElementById('datafile').value = '';
+        }, 2000);
       }
       function errorHandler(evt) {
         console.log(evt);
@@ -175,11 +199,10 @@
       // Dumping
       // TODO: Call this automatically after each modification, or onbeforeclick on download link?
       function dump() {
-        trainingCenterDatabase.children_ = [];
         trainingCenterDatabase.children_.push(activities.toXml());
         //console.log(printNode(trainingCenterDatabase));
-        var str = xml + '\n' + printNode(trainingCenterDatabase);
-        // TOOD: urlencode() ?
+        var str = xmlHeader + '\n' + printNode(trainingCenterDatabase);
+        trainingCenterDatabase.children_ = [];
         document.getElementById('dumpLink').href = 'data:text/xml,' + escape(str);
       }
 
@@ -324,11 +347,14 @@
       // Activities
       Activities = function(node) {
         this.activities_ = [];
+        this.dom_ = createDiv('activities wide');
+        this.dom_.innerHTML = 'No activities yet - load some!';
+      };
+      Activities.prototype.addFromXml = function(node) {
         // All children are type Activity
         for (var i = 0; i < node.numChildren(); i++) {
           this.activities_.push(new Activity(node.childAt(i)));
         }
-        this.dom_ = createDiv('activities wide');
         this.rebuildDom();
       };
       Activities.prototype.rebuildDom = function() {
@@ -790,7 +816,8 @@
         var result = true;
         // Check metadata
         if (this.startTime_ != this.firstTrack().firstTrackpoint().time_) {
-          errorMessages.push('Start time inconsistent');
+          errorMessages.push('Start time inconsistent: ' + this.startTime_ +
+                             ' vs ' + this.firstTrack().firstTrackpoint().time_);
           result = false;
         }
 	// Total time field uses decimals, but time stamps do not, so sum from
@@ -856,16 +883,18 @@
       }
       // This could return null.
       Track.prototype.firstNonTimeOnlyTrackpoint = function() {
-        if (!this.trackpoints_[0].isTimeOnly_) {
-          return this.trackpoints_[0];
+        var length = this.trackpoints_.length;
+        for (var i = 0; i < length; ++i) {
+          if (!this.trackpoints_[i].isTimeOnly_) {
+            return this.trackpoints_[i];
+          }
         }
-        if (this.trackpoints_.length == 1) {
+        if (length <= MAX_CONSECUTIVE_TIME_ONLY_TRACKPOINTS) {
           return null;
         }
-        if (!this.trackpoints_[1].isTimeOnly_) {
-          return this.trackpoints_[1];
-        }
-        throw new Error('Multiple time-only trackpoints found at start of track');
+        console.log(this.trackpoints_[0]);
+        throw new Error('Multiple time-only trackpoints found at start of track: ' +
+                        this.trackpoints_[0].time_);
       }
       Track.prototype.lastTrackpoint = function() {
         return this.trackpoints_[this.trackpoints_.length - 1];
@@ -873,16 +902,16 @@
       // This could return null.
       Track.prototype.lastNonTimeOnlyTrackpoint = function() {
         var length = this.trackpoints_.length;
-        if (!this.trackpoints_[length - 1].isTimeOnly_) {
-          return this.trackpoints_[length - 1];
+        for (var i = length - 1; i >= 0; --i) {
+          if (!this.trackpoints_[i].isTimeOnly_) {
+            return this.trackpoints_[i];
+          }
         }
-        if (length == 1) {
+        if (length <= MAX_CONSECUTIVE_TIME_ONLY_TRACKPOINTS) {
           return null;
         }
-        if (!this.trackpoints_[length - 2].isTimeOnly_) {
-          return this.trackpoints_[length - 2];
-        }
-        throw new Error('Multiple time-only trackpoints found at end of track');
+        throw new Error('Multiple time-only trackpoints found at end of track: ' +
+                        this.trackpoints_[length - 1].time_);
       }
       Track.prototype.isTimeOnly = function() {
         return this.firstNonTimeOnlyTrackpoint() == null;
@@ -1007,10 +1036,6 @@
         float: left;
         width: 700px;
       }
-      pre#dump {
-        font-size: x-small;
-        margin-left: 700px;
-      }
       span {
         margin-right: 10px;
       }
@@ -1025,15 +1050,16 @@
       }
     </style>
   </head>
-  <body>
+  <body onload="OnLoad();">
     <div>
       Data file:<input type="file" id="datafile">
       <button onclick="load()">Load</button>
-      <span id="progress"></span>
-      <button onclick="dump()">Dump</button>
+      <span id="progress">Ready</span>
     </div>
-    <div><a href="" id="dumpLink">download</a></div>
+    <div>
+      <button onclick="dump()">Dump</button>
+      <a href="" id="dumpLink">download</a>
+    </div>
     <div id="display"></div>
-    <pre id="dump"></pre>
   <body>
 </html>
