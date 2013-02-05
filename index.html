@@ -2,7 +2,38 @@
 <html>
   <head>
     <script type="text/javascript">
+      // Behaviour
+      // - It seems app and website ignore tracks within a lap
+      // - Assume that each lap (and therefore activity) contains at least one track with position data.
+      // - Pressing stop then start causes a new track to be started.
+      //   It seems the old track may be finished and the new track started with a time-only trackpoint, presumbaly to record a precise timestamp even when no position is available.
+      // - Pressing lap while started causes a new lap to be started
+      //   The above is true about the final and starting trackpoints. 
+      // - Pressing lap while stopped causes a new lap to be started.
+      //   It seems the previous lap is always terminated with a dummy track in this case, with only a single time-only trackpoint. Not sure why this is. The dummy track is 1s before the start of the new lap.
+      // - Turning off then on while started causes a new track to be started (TODO: And lap?)
+      // - Turning off then on while stopped also causes a new track to be started (TODO: And lap?)
+      // - Turning off then on while stopped and after pressing lap causes a new lap to be started
+      //   The dummy track mentioned above seems to be written as part of the new lap in this case
+      // Weirdness
+      // - There seems to be a condition where the lap distance doesn't match the track distances
+      // - There seems to be a condition where, when starting a new lap (perhaps when also turning off then on?), the previous lap is terminated with a track with two trackpoints, rather then 1.
+      //   The second of which is 1s before the new lap as normal, but the first is 1s after the previous track.
+      //   This messes up the total time for the lap.
+      //   It can be fixed by deleting the lap.
+      // Conclusions
+      // - A track can have at most one time-only trackpoints at each end
+      // - A lap can have at most one dummy (single time-only trackpoint) at each end
+      // Plan
+      // - We should preserve the above.
+      //   So when merging tracks, we should remove time-only trackpoints at the merge point
+      //   So when merging laps, we should remove dummy trackpoints at the merge point
+
       // TODO:
+      // - Remove ability to merge tracks - no need
+      // - Check activity starts at distance zero?
+      // - Fix collapsing and fixing with tracks with no position data
+      // - Allow manual override of displacement for merging laps/activities
       // - Replace node with DOMParser builtin - see index.html.190612
       // - Recalc maximum speed
       // - Write to file with file API?
@@ -22,7 +53,7 @@
       // Estimates the displacement between two waypoints based on their
       // lat/lng, not their distance field. Used for estimating displacement
       // between the end of one track/lap/activity and the start of the next.
-        function estimateDisplacementMeters(start, end) {
+      function estimateDisplacementMeters(start, end) {
         var deltaLatitude = (end.latitudeDegrees_ - start.latitudeDegrees_);
         var scaleFactor = Math.sin((end.latitudeDegrees_ + start.latitudeDegrees_) / 2 * Math.PI / 180);
         var deltaLongitude = (end.longitudeDegrees_ - start.longitudeDegrees_) * scaleFactor;
@@ -324,15 +355,18 @@
           if (i == this.activities_.length - 1) {
             continue;
           }
-          var start = this.activities_[i].lastLap().lastTrack().lastTrackpoint();
-          var end = this.activities_[i + 1].firstLap().firstTrack().firstTrackpoint();
-          var time = timeDifferenceSeconds(start, end);
-          var displacement = estimateDisplacementMeters(start, end);
+          var start = this.activities_[i].lastLap();
+          var end = this.activities_[i + 1].firstLap();
+          var time = timeDifferenceSeconds(start.lastTrack().lastTrackpoint(),
+                                           end.firstTrack().firstTrackpoint());
+          var displacement = estimateDisplacementMeters(
+              start.lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint(),
+              end.firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint());
           var collapser = createDiv('activity wide collapser');
-          collapser.appendChild(createButton('Collapse Activities ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseActivityWithPrevious(j); }; })(this, i + 1)));
+          collapser.appendChild(createButton('Collapse activities ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseActivityWithPrevious(j); }; })(this, i + 1)));
           var table = document.createElement('table');
           table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(time)]));
-          table.appendChild(createTableRow('Approximate displacement (km)', [displacement / 1000]));
+          table.appendChild(createTableRow('Approximate displacement (m)', [displacement]));
           collapser.appendChild(table);
           this.dom_.appendChild(collapser);
         }
@@ -426,19 +460,23 @@
           this.laps_[i].rebuildDom();
           div.appendChild(this.laps_[i].dom_);
           this.dom_.appendChild(div);
+          // TODO: Check distance continuity between laps.
           // Collapser
           if (i == this.laps_.length - 1) {
             continue;
           }
-          var start = this.laps_[i].lastTrack().lastTrackpoint();
-          var end = this.laps_[i + 1].firstTrack().firstTrackpoint();
-          var time = timeDifferenceSeconds(start, end);
-          var displacement = estimateDisplacementMeters(start, end);
+          var start = this.laps_[i];
+          var end = this.laps_[i + 1];
+          var time = timeDifferenceSeconds(start.lastTrack().lastTrackpoint(),
+                                           end.firstTrack().firstTrackpoint());
+          var displacement = estimateDisplacementMeters(
+              start.lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint(),
+              end.firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint());
           var collapser = createDiv('lap wide collapser');
-          collapser.appendChild(createButton('Collapse Laps ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseLapWithPrevious(j); }; })(this, i + 1)));
+          collapser.appendChild(createButton('Collapse laps ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseLapWithPrevious(j); }; })(this, i + 1)));
           var table = document.createElement('table');
           table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(time)]));
-          table.appendChild(createTableRow('Approximate displacement (km)', [displacement / 1000]));
+          table.appendChild(createTableRow('Approximate displacement (m)', [displacement]));
           collapser.appendChild(table);
           this.dom_.appendChild(collapser);
         }
@@ -502,12 +540,7 @@
         this.tracks_ = [];
         for (var i = 0; i < node.numChildren(); i++) {
           if (node.childAt(i).tag_ == 'Track') {
-            // The Track constructor will fail and throw if no valid trackpoints are found.
-            try {
-              this.tracks_.push(new Track(node.childAt(i)));
-            } catch(e) {
-              //console.log(e);
-            }
+            this.tracks_.push(new Track(node.childAt(i)));
           }
         }
         this.dom_ = createDiv('');
@@ -516,15 +549,51 @@
       Lap.prototype.firstTrack = function() {
         return this.tracks_[0];
       }
+      // This can never return null.
+      Lap.prototype.firstNonTimeOnlyTrack = function() {
+        if (!this.tracks_[0].isTimeOnly()) {
+          return this.tracks_[0];
+        }
+        if (this.tracks_.length == 1) {
+          throw new Error('Lap must contain a non-time-only track');
+        }
+        if (!this.tracks_[1].isTimeOnly()) {
+          return this.tracks_[1];
+        }
+        throw new Error('Multiple time-only tracks found at start of lap');
+      }
       Lap.prototype.lastTrack = function() {
         return this.tracks_[this.tracks_.length - 1];
+      }
+      // This can never return null.
+      Lap.prototype.lastNonTimeOnlyTrack = function() {
+        var length = this.tracks_.length;
+        if (!this.tracks_[length - 1].isTimeOnly()) {
+          return this.tracks_[length - 1];
+        }
+        if (length == 1) {
+          throw new Error('Lap must contain a non-time-only track');
+        }
+        if (!this.tracks_[length - 2].isTimeOnly()) {
+          return this.tracks_[length - 2];
+        }
+        throw new Error('Multiple time-only tracks found at start of lap');
+      }
+      Lap.prototype.numTimeOnlyTracks = function() {
+        var count = 0;
+        for (var i = 0; i < this.tracks_.length; ++i) {
+          if (this.tracks_[i].isTimeOnly()) {
+            ++count;
+          } 
+        }
+        return count;
       }
       Lap.prototype.rebuildDom = function() {
         this.dom_.innerHTML = '';
         var table = document.createElement('table');
         table.appendChild(createTableRow('Start time', [this.startTime_]));
         table.appendChild(createTableRow('Total time (HH:MM:SS)', [toHourMinSec(this.totalTimeSeconds_)]));
-        table.appendChild(createTableRow('Distance (km)', [this.distanceMeters_ / 1000]));
+        table.appendChild(createTableRow('Distance (m)', [this.distanceMeters_]));
         table.appendChild(createTableRow('Maximum speed (m/s)', [this.maximumSpeed_]));
         table.appendChild(createTableRow('Calories', [this.calories_]));
         this.dom_.appendChild(table);
@@ -545,8 +614,9 @@
         for (var i = 0; i < this.tracks_.length; i++) {
           // Track
           var div = createDiv('track wide');
-          div.appendChild(createTextSpan('Track ' + (i + 1) +' of ' + this.tracks_.length));
-          if (this.tracks_.length > 1) {
+          div.appendChild(createTextSpan('Track ' + (i + 1) +' of ' + this.tracks_.length +
+              (this.tracks_[i].isTimeOnly() ? ' (time-only)' : '')));
+          if (this.tracks_[i].isTimeOnly() || this.tracks_.length - this.numTimeOnlyTracks() > 1) {
             div.appendChild(createButton(
                 'Remove',
                 (function(me, j) { return function() { me.removeTrack(j); }; })(this, i)));
@@ -558,17 +628,22 @@
           if (i == this.tracks_.length - 1) {
             continue;
           }
-          var start = this.tracks_[i].lastTrackpoint();
-          var end = this.tracks_[i + 1].firstTrackpoint();
-          var time = timeDifferenceSeconds(start, end);
-          var displacement = estimateDisplacementMeters(start, end);
+          var start = this.tracks_[i];
+          var end = this.tracks_[i + 1];
+          var time = timeDifferenceSeconds(start.lastTrackpoint(),
+                                           end.firstTrackpoint());
           var collapser = createDiv('track wide collapser');
           collapser.appendChild(createButton(
               'Collapse Tracks ' + (i + 1) + ' and ' + (i + 2),
               (function(me, j) { return function() { me.collapseTrackWithPrevious(j); }; })(this, i + 1)));
           var table = document.createElement('table');
           table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(time)]));
-          table.appendChild(createTableRow('Approximate displacement (km)', [displacement / 1000]));
+          if (!start.isTimeOnly() && !end.isTimeOnly()) {
+            var displacement = estimateDisplacementMeters(
+                start.lastNonTimeOnlyTrackpoint(),
+                end.firstNonTimeOnlyTrackpoint());
+            table.appendChild(createTableRow('Approximate displacement (m)', [displacement]));
+          }
           collapser.appendChild(table);
           this.dom_.appendChild(collapser);
         }
@@ -577,8 +652,9 @@
         console.log('Removing track ' + index);
 	// When removing a track, we need to shift the distances of all later
 	// tracks and update the time and distance for the lap.
-        var distance = this.tracks_[index].firstTrackpoint().distanceMeters_ -
-            this.tracks_[index].lastTrackpoint().distanceMeters_;
+        // TODO: No position?!
+        var distance = this.tracks_[index].firstNonTimeOnlyTrackpoint().distanceMeters_ -
+            this.tracks_[index].lastNonTimeOnlyTrackpoint().distanceMeters_;
         for (var i = index + 1; i < this.tracks_.length; i++) {
           console.log('Shifting track ' + (i + 1) + ' by ' + distance);
           this.tracks_[i].shiftDistances(distance);
@@ -598,10 +674,12 @@
 	// When collapsing tracks, we need to account for the time and distance
 	// between them. This means shifting the distances of this and all
 	// later tracks and updating the time and distance for the lap.
-        var start = previousTrack.lastTrackpoint();
-        var end = thisTrack.firstTrackpoint();
-        var time = timeDifferenceSeconds(start, end);
-        var displacement = estimateDisplacementMeters(start, end);
+        var time = timeDifferenceSeconds(previousTrack.lastTrackpoint(),
+                                         thisTrack.firstTrackpoint());
+        // TODO: No position?!
+        var displacement = estimateDisplacementMeters(
+            previousTrack.lastNonTimeOnlyTrackpoint(),
+            thisTrack.firstNonTimeOnlyTrackpoint());
         for (var i = index; i < this.tracks_.length; i++) {
           console.log('Shifting track ' + (i + 1) + ' by distance ' + displacement);
           this.tracks_[i].shiftDistances(displacement);
@@ -632,15 +710,16 @@
       Lap.prototype.calculateDistance = function() {
 	// This will be correct even if the first track does not start at
 	// distance zero.
-        return this.lastTrack().lastTrackpoint().distanceMeters_ -
-            this.firstTrack().firstTrackpoint().distanceMeters_;
+        return this.lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint().distanceMeters_ -
+            this.firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
       };
       Lap.prototype.fixInconsistencies = function() {
-        var offset = - this.firstTrack().firstTrackpoint().distanceMeters_;
+        var offset = - this.firstTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
         this.firstTrack().shiftDistances(offset);
+        // TODO: No position?!
         for (var i = 1; i < this.tracks_.length; i++) {
-          var offset = this.tracks_[i - 1].lastTrackpoint().distanceMeters_ -
-              this.tracks_[i].firstTrackpoint().distanceMeters_;
+          var offset = this.tracks_[i - 1].lastNonTimeOnlyTrackpoint().distanceMeters_ -
+              this.tracks_[i].firstNonTimeOnlyTrackpoint().distanceMeters_;
           console.log('Shifting track ' + (i + 1) + ' by distance ' + offset);
           this.tracks_[i].shiftDistances(offset);
         }
@@ -655,25 +734,27 @@
           errorMessages.push('Start time inconsistent');
           result = false;
         }
-        // Total time field uses decimals, but time stamps do not.
-        if (Math.abs(this.totalTimeSeconds_ - this.calculateTotalTime()) > 0.5) {
+	// Total time field uses decimals, but time stamps do not, so sum from
+	// timestamps can be off by up to a second for each track.
+	// TODO: Technically, if a track has only one trackpoint, it can't
+	// contribute any error, so we should account for this.
+        if (Math.abs(this.totalTimeSeconds_ - this.calculateTotalTime()) > this.tracks_.length) {
           errorMessages.push('Total time inconsistent: ' + this.totalTimeSeconds_ +
                              ' vs. ' + this.calculateTotalTime());
           result = false;
         }
-        if (this.distanceMeters_ != this.calculateDistance()) {
-          errorMessages.push('Distance inconsistent');
+        if (Math.abs(this.distanceMeters_ - this.calculateDistance()) > 0.1) {
+          errorMessages.push('Distance inconsistent: ' + this.distanceMeters_ +
+                             'm vs ' + this.calculateDistance() + 'm');
           result = false;
         }
         // TODO: Check maximum speed
         // Check distances are continuous
-        if (this.firstTrack().firstTrackpoint().distanceMeters_ != 0) {
-          errorMessages.push('First track does not start at distance zero');
-          result = false;
-        }
         for (var i = 1; i < this.tracks_.length; i++) {
-          if (this.tracks_[i - 1].lastTrackpoint().distanceMeters_ !=
-              this.tracks_[i].firstTrackpoint().distanceMeters_) {
+          var start = this.tracks_[i - 1];
+          var end = this.tracks_[i];
+          if (!start.isTimeOnly() && !end.isTimeOnly() &&
+              start.lastNonTimeOnlyTrackpoint().distanceMeters_ != end.firstNonTimeOnlyTrackpoint().distanceMeters_) {
             errorMessages.push('Distance discrepancy between tracks ' + i + ' and ' +
                                (i + 1));
             result = false;
@@ -708,14 +789,7 @@
         this.trackpoints_ = [];
         // No metadata and all children are type Trackpoint
         for (var i = 0; i < node.numChildren(); i++) {
-          var trackpoint = node.childAt(i);
-	  // Some trackpoints contain only a timestamp. No idea why. There
-	  // seems to be no pattern, so just ignore them.
-          if (trackpoint.numChildren() == 1) {
-            //console.log('Skipping empty trackpoint');
-            continue;
-          }
-          this.trackpoints_.push(new Trackpoint(trackpoint));
+          this.trackpoints_.push(new Trackpoint(node.childAt(i)));
         }
         if (this.trackpoints_.length == 0) {
           throw new Error('No viable trackpoints found');
@@ -726,23 +800,81 @@
       Track.prototype.firstTrackpoint = function() {
         return this.trackpoints_[0];
       }
+      // This could return null.
+      Track.prototype.firstNonTimeOnlyTrackpoint = function() {
+        if (!this.trackpoints_[0].isTimeOnly_) {
+          return this.trackpoints_[0];
+        }
+        if (this.trackpoints_.length == 1) {
+          return null;
+        }
+        if (!this.trackpoints_[1].isTimeOnly_) {
+          return this.trackpoints_[1];
+        }
+        throw new Error('Multiple time-only trackpoints found at start of track');
+      }
       Track.prototype.lastTrackpoint = function() {
         return this.trackpoints_[this.trackpoints_.length - 1];
       }
+      // This could return null.
+      Track.prototype.lastNonTimeOnlyTrackpoint = function() {
+        var length = this.trackpoints_.length;
+        if (!this.trackpoints_[length - 1].isTimeOnly_) {
+          return this.trackpoints_[length - 1];
+        }
+        if (length == 1) {
+          return null;
+        }
+        if (!this.trackpoints_[length - 2].isTimeOnly_) {
+          return this.trackpoints_[length - 2];
+        }
+        throw new Error('Multiple time-only trackpoints found at end of track');
+      }
+      Track.prototype.isTimeOnly = function() {
+        return this.firstNonTimeOnlyTrackpoint() == null;
+      }
+      Track.prototype.numTimeOnlyTrackpoints = function() {
+        var count = 0;
+        for (var i = 0; i < this.trackpoints_.length; ++i) {
+          if (this.trackpoints_[i].isTimeOnly_) {
+            ++count;
+          } 
+        }
+        return count;
+      }
       Track.prototype.rebuildDom = function() {
         this.dom_.innerHTML = '';
-        var first = this.firstTrackpoint();
-        var last = this.lastTrackpoint();
-        this.dom_.appendChild(createTableRow('Num trackpoints', [this.trackpoints_.length]));
-        this.dom_.appendChild(createTableRow('Start/End time', [first.time_, last.time_]));
-        this.dom_.appendChild(createTableRow('Start/End distance (km)', [first.distanceMeters_ / 1000, last.distanceMeters_ / 1000]));
-        this.dom_.appendChild(createTableRow('Start/End altitude (m)', [first.altitudeMeters_, last.altitudeMeters_]));
-        this.dom_.appendChild(createTableRow('Start/End latitude (deg)', [first.latitudeDegrees_, last.latitudeDegrees_]));
-        this.dom_.appendChild(createTableRow('Start/End longitude (deg)', [first.longitudeDegrees_, last.longitudeDegrees_]));
+        var first = this.firstNonTimeOnlyTrackpoint();
+        var last = this.lastNonTimeOnlyTrackpoint();
+        this.dom_.appendChild(createTableRow(
+            'Num trackpoints',
+            [this.trackpoints_.length, '(' + this.numTimeOnlyTrackpoints() + ' time-only)']));
+        this.dom_.appendChild(createTableRow(
+            'Start/End time',
+            [this.firstTrackpoint().time_, this.lastTrackpoint().time_]));
+        if (this.isTimeOnly()) {
+          this.dom_.appendChild(createTableRow('No position data', []));
+          return;
+        }
+        this.dom_.appendChild(createTableRow(
+            'Start/End distance (km)',
+            [first.distanceMeters_ / 1000, last.distanceMeters_ / 1000]));
+        this.dom_.appendChild(createTableRow(
+            'Start/End altitude (m)',
+            [first.altitudeMeters_, last.altitudeMeters_]));
+        this.dom_.appendChild(createTableRow(
+            'Start/End latitude (deg)',
+            [first.latitudeDegrees_, last.latitudeDegrees_]));
+        this.dom_.appendChild(createTableRow(
+            'Start/End longitude (deg)',
+            [first.longitudeDegrees_, last.longitudeDegrees_]));
       };
       Track.prototype.shiftDistances = function(delta) {
         for (var i = 0; i < this.trackpoints_.length; i++) {
-          this.trackpoints_[i].distanceMeters_ += delta;
+          var trackpoint = this.trackpoints_[i];
+          if (!trackpoint.isTimeOnly_) {
+            trackpoint.distanceMeters_ += delta;
+          }
         }
       }
       Track.prototype.print = function(indent) {
@@ -765,6 +897,11 @@
       // Trackpoint
       Trackpoint = function(node) {
         this.time_ = node.firstChildOfType('Time').data_;
+        if (node.numChildren() == 1) {
+          this.isTimeOnly_ = true;
+          return;
+        }
+        this.isTimeOnly_ = false;
         var position = node.firstChildOfType('Position');
         this.latitudeDegrees_ = Number(position.firstChildOfType('LatitudeDegrees').data_).valueOf();
         this.longitudeDegrees_ = Number(position.firstChildOfType('LongitudeDegrees').data_).valueOf();
@@ -777,12 +914,14 @@
       Trackpoint.prototype.toXml = function() {
         var node = new Node('Trackpoint');
         node.children_.push(new Node('Time', this.time_));
-        var position = new Node('Position');
-        position.children_.push(new Node('LatitudeDegrees', this.latitudeDegrees_));
-        position.children_.push(new Node('LongitudeDegrees', this.longitudeDegrees_));
-        node.children_.push(position);
-        node.children_.push(new Node('AltitudeMeters', this.altitudeMeters_));
-        node.children_.push(new Node('DistanceMeters', this.distanceMeters_));
+        if (!this.isTimeOnly_) {
+          var position = new Node('Position');
+          position.children_.push(new Node('LatitudeDegrees', this.latitudeDegrees_));
+          position.children_.push(new Node('LongitudeDegrees', this.longitudeDegrees_));
+          node.children_.push(position);
+          node.children_.push(new Node('AltitudeMeters', this.altitudeMeters_));
+          node.children_.push(new Node('DistanceMeters', this.distanceMeters_));
+        }
         return node;
       };
     </script>
