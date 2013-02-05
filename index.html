@@ -23,14 +23,13 @@
       //   It can be fixed by deleting the lap.
       // - It seems to be possible to end up with a dummy track with two trackpoints.
       // Conclusions
-      // - A track can have at most one time-only trackpoints at each end
+      // - A track can have at most one time-only trackpoint at each end
       // - A lap can have at most one dummy (single time-only trackpoint) at each end
       // Plan
       // - No need to offer collapsing of tracks, as viewer ignores them anyway.
       // - We should preserve the above. So when merging laps, we should remove dummy trackpoints at the merge point
 
       // TODOs
-      // - Handle multisport
       // - Bug with deleting first lap of shipAndSydney
       // - Update distance/time between laps/activities when deleting tracks/laps
       // - Show tracks on map
@@ -351,9 +350,28 @@
         this.dom_.innerHTML = 'No activities yet - load some!';
       };
       Activities.prototype.addFromXml = function(node) {
-        // All children are type Activity
+	// Children may be Activity or MultiSportSession. For the latter, we
+	// just pull out the Activity objects.
+        // TODO: Introduce concept of MultiSportSession?
         for (var i = 0; i < node.numChildren(); i++) {
-          this.activities_.push(new Activity(node.childAt(i)));
+          var child = node.childAt(i);
+          if (child.tag_ == 'Activity') {
+            this.activities_.push(new Activity(child));
+          } else if (child.tag_ == 'MultiSportSession') {
+            for (var j = 0; j < child.numChildren(); j++) {
+              var grandChild = child.childAt(j);
+              if (grandChild.tag_ == 'FirstSport' || grandChild.tag_ == 'NextSport') {
+                // There should only be a sing le child, of type Activity.
+                var greatGrandChild = grandChild.childAt(0);
+                if (greatGrandChild.tag_ != 'Activity') {
+                  throw new Error('Unexpected tag \'' + greatGrandChild.tag_ + '\' in \'' + grandChild.tag_ + '\'');
+                }
+                this.activities_.push(new Activity(greatGrandChild));
+              }
+            }
+          } else {
+            throw new Error('Unexpected tag \'' + child.tag_ + '\' in \'Activities\'');
+          }
         }
         this.rebuildDom();
       };
@@ -632,6 +650,9 @@
         this.rebuildDom();
       };
       Lap.prototype.firstTrack = function() {
+        if (this.tracks_.length < 1) {
+          throw new Error('Laps must contain at least one track.');
+        }
         return this.tracks_[0];
       }
       // This can never return null.
@@ -879,6 +900,9 @@
         this.rebuildDom();
       };
       Track.prototype.firstTrackpoint = function() {
+        if (this.trackpoints_.length < 1) {
+          throw new Error('Tracks must contain at least one trackpoint.');
+        }
         return this.trackpoints_[0];
       }
       // This could return null.
