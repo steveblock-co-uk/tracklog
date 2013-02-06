@@ -52,7 +52,6 @@
       // - Allow manual override of displacement for merging laps/activities - does this make sense?
       // - Add tests
       // - Recalc maximum speed
-      // - Write to file with file API?
 
       //////////////////////////////////////////////////////////////////////////
       // Globals
@@ -188,18 +187,42 @@
         console.log(evt);
       }
 
+      // Given a string and a callback function, creates a local file with the
+      // string as its contents and invokes the callbacl function with a
+      // filestem: URL to the newly created file.
+      var writeLocalFile = function(contents, onSuccess) {
+        window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
+        requestFileSystem(window.TEMPORARY, 1024 * 1024 /* 1MB */, function(fileSystem) {
+          fileSystem.root.getFile('output.tcx', {create: true}, function(fileEntry) {
+            console.log(fileEntry.toURL());
+            fileEntry.createWriter(function(fileWriter) {
+              fileWriter.onwriteend = function(e) { console.log('Write completed.'); onSuccess(fileEntry.toURL()); };
+              fileWriter.onerror = errorHandler;
+              fileWriter.write(new Blob([contents], {type: 'text/plain'}));
+            }, errorHandler);
+          }, errorHandler);
+        }, errorHandler);
+      };
+
       //////////////////////////////////////////////////////////////////////////
       // Dumping
       // TODO: Call this automatically after each modification, or onbeforeclick on download link?
       function dump() {
+        var dumpLink = document.getElementById('dumpLink');
+        dumpLink.style.visibility = "hidden";
+
         var trainingCenterDatabase = root.firstChild;
         trainingCenterDatabase.appendChild(activities.toXml());
         var str = (new XMLSerializer).serializeToString(root);
         trainingCenterDatabase.removeChild(trainingCenterDatabase.firstChild);
-        var dumpLink = document.getElementById('dumpLink');
-        // TODO: Chrome crashes if the URL exceeds 2M characters, even for download URLS.
-        dumpLink.href = 'data:text/xml,' + escape(str);
-        dumpLink.download = document.getElementById('datafile').files[0].name.replace(/\.tcx$/, "-modified.tcx");
+
+	// We write to a local file to avoid Chrome's 2M character limit on the
+	// length of a data URL.
+        writeLocalFile(str, function(filename) {
+          dumpLink.href = filename;
+          dumpLink.download = document.getElementById('datafile').files[0].name.replace(/\.tcx$/, "-modified.tcx");
+          dumpLink.style.visibility = "visible";
+        });
       }
 
       //////////////////////////////////////////////////////////////////////////
@@ -951,6 +974,9 @@
       }
       div.errors ul {
         margin: 0px;
+      }
+      a#dumpLink {
+        visibility: hidden;
       }
     </style>
   </head>
