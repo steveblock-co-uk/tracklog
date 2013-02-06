@@ -200,11 +200,7 @@
           trainingCenterDatabase = inputXml;
           trainingCenterDatabase.children_ = [];
         }
-        document.getElementById('progress').innerText = 'Done';
-        setTimeout(function() {
-          document.getElementById('progress').innerText = 'Ready';
-          document.getElementById('datafile').value = '';
-        }, 2000);
+        document.getElementById('progress').innerText = 'Ready';
       }
       function errorHandler(evt) {
         console.log(evt);
@@ -218,7 +214,10 @@
         //console.log(printNode(trainingCenterDatabase));
         var str = xmlHeader + '\n' + printNode(trainingCenterDatabase);
         trainingCenterDatabase.children_ = [];
-        document.getElementById('dumpLink').href = 'data:text/xml,' + escape(str);
+        var dumpLink = document.getElementById('dumpLink');
+        // TODO: Chrome crashes if the URL exceeds 2M characters, even for download URLS.
+        dumpLink.href = 'data:text/xml,' + escape(str);
+        dumpLink.download = document.getElementById('datafile').files[0].name.replace(/\.tcx$/, "-modified.tcx");
       }
 
       //////////////////////////////////////////////////////////////////////////
@@ -1117,7 +1116,7 @@
     </div>
     <div>
       <button onclick="dump()">Dump</button>
-      <a href="" id="dumpLink">download</a>
+      <a href="" download="" id="dumpLink">download</a>
     </div>
     <div id="display"></div>
   <body>
