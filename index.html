@@ -193,12 +193,12 @@
       }
       function convert() {
         // Convert to our format
-        activities.addFromXml(inputXml.firstChildOfType('Activities'));
+        activities.addFromXml(inputXml.getElementsByTagName('Activities')[0]);
 
         // Cache root node for use in output.
         if (trainingCenterDatabase == null) {
           trainingCenterDatabase = inputXml;
-          trainingCenterDatabase.children_ = [];
+          trainingCenterDatabase.childNodes = [];
         }
         document.getElementById('progress').innerText = 'Ready';
       }
@@ -210,10 +210,10 @@
       // Dumping
       // TODO: Call this automatically after each modification, or onbeforeclick on download link?
       function dump() {
-        trainingCenterDatabase.children_.push(activities.toXml());
+        trainingCenterDatabase.childNodes.push(activities.toXml());
         //console.log(printNode(trainingCenterDatabase));
         var str = xmlHeader + '\n' + printNode(trainingCenterDatabase);
-        trainingCenterDatabase.children_ = [];
+        trainingCenterDatabase.childNodes = [];
         var dumpLink = document.getElementById('dumpLink');
         // TODO: Chrome crashes if the URL exceeds 2M characters, even for download URLS.
         dumpLink.href = 'data:text/xml,' + escape(str);
@@ -238,14 +238,20 @@
       //////////////////////////////////////////////////////////////////////////
       // Node
       Node = function(arg1, arg2) {
-        this.children_ = [];
+        this.childNodes = [];
         this.params_ = {};
         if (typeof arg1 == 'string') {
-          this.tag_ = arg1;
-          this.data_ = arg2;
+          this.tagName = arg1;
+          this.textContent = arg2;
         } else if (arg1 instanceof Stream) {
           this.fromStream(arg1);
         }
+      };
+      Node.prototype.getAttribute = function(key) {
+        return this.params_[key];
+      };
+      Node.prototype.setAttribute = function(key, value) {
+        this.params_[key] = value;
       };
       // Creates a Node from the stream. Ignores cruft in the stream after the end tag.
       Node.prototype.fromStream = function(stream) {
@@ -258,7 +264,7 @@
         // Handle params
         var tagAndParams = trimRight(stream.string(), RAB);
         var params = tagAndParams.split(' ');
-        this.tag_ = params[0];
+        this.tagName = params[0];
         for (var i = 1; i < params.length; i++) {
           var x = params[i].split('=');
           if (x.length == 2) {
@@ -268,13 +274,13 @@
         stream.advancePast(RAB);
         stream.trim();
         // Handle single tags
-        var tagLength = this.tag_.length;
-        if (this.tag_.charAt(tagLength - 1) == '/') {
-          this.tag_ = this.tag_.substr(0, tagLength - 1);
-          //console.log('Found single tag ' + this.tag_);
+        var tagLength = this.tagName.length;
+        if (this.tagName.charAt(tagLength - 1) == '/') {
+          this.tagName = this.tagName.substr(0, tagLength - 1);
+          //console.log('Found single tag ' + this.tagName);
           return;
         }
-        //console.log('Node(): tag_ = ' + this.tag_);
+        //console.log('Node(): tagName = ' + this.tagName);
 	// If the next character in the stream is a left angle brace, but
 	// doesn't start an end node, it must be the start of child nodes
         // TODO: Can we simplify the logic for this loop?
@@ -288,48 +294,43 @@
             // If the next tag is a close tag, bail
             // TODO: Could we eliminate the search here by trimming the whitespace?
             if (stream.string().charAt(stream.string().indexOf(LAB) + 1) == '/') {
-              //console.log('Got close tag for ' + this.tag_ + ', breaking');
+              //console.log('Got close tag for ' + this.tagName + ', breaking');
               break;
             }
             // Otherwise, assume it's a well-formed tag and create a new Node
-            this.children_.push(new Node(stream));
+            this.childNodes.push(new Node(stream));
           }
         } else {
           // Otherwise read data. This may be the empty string.
-          this.data_ = trimRight(stream.string(), LAB);
-          //console.log('Got data: ' + this.data_);
+          this.textContent = trimRight(stream.string(), LAB);
+          //console.log('Got data: ' + this.textContent);
         }
         try {
           stream.advancePast(this.closeTag());
         } catch(e) {
-          throw new Error('Malformed input: failed to find close tag for tag ' + this.tag_ + '. Next input is ' + stream.string().substr(0, 100) + ' ...');
+          throw new Error('Malformed input: failed to find close tag for tag ' + this.tagName + '. Next input is ' + stream.string().substr(0, 100) + ' ...');
         }
         stream.trim();
-        //console.log('Node(): Done: tag_ = ' + this.tag_);
-      };
-      Node.prototype.numChildren = function() {
-        return this.children_.length;
-      };
-      Node.prototype.childAt = function(i) {
-        return this.children_[i];
+        //console.log('Node(): Done: tagName = ' + this.tagName);
       };
       Node.prototype.openTag = function() {
-        var str = LAB + this.tag_;
+        var str = LAB + this.tagName;
         for (var i in this.params_) {
           str += ' ' + i + '=\'' + this.params_[i] + '\'';
         }
         return str + RAB;
       };
       Node.prototype.closeTag = function() {
-        return LAB + '/' + this.tag_ + RAB;
+        return LAB + '/' + this.tagName + RAB;
       };
-      Node.prototype.firstChildOfType = function(type) {
-        for (var i = 0; i < this.children_.length; i++) {
-          if (this.children_[i].tag_ == type) {
-            return this.children_[i];
+      Node.prototype.getElementsByTagName = function(type) {
+        var ret = [];
+        for (var i = 0; i < this.childNodes.length; i++) {
+          if (this.childNodes[i].tagName == type) {
+            ret.push(this.childNodes[i]);
           }
         }
-        return null;
+        return ret;
       };
 
       //////////////////////////////////////////////////////////////////////////
@@ -344,12 +345,12 @@
           indent += increment;
         }
         x = indent + node.openTag();
-        if (node.numChildren() == 0) {
-          x += node.data_;
+        if (node.childNodes.length == 0) {
+          x += node.textContent;
         } else {
           x += '\n';
-          for (var i = 0; i < node.numChildren(); i++) {
-            x += printNode(node.childAt(i), depth + 1);
+          for (var i = 0; i < node.childNodes.length; i++) {
+            x += printNode(node.childNodes[i], depth + 1);
           }
           x += indent;
         }
@@ -378,24 +379,25 @@
 	// Children may be Activity or MultiSportSession. For the latter, we
 	// just pull out the Activity objects.
         // TODO: Introduce concept of MultiSportSession?
-        for (var i = 0; i < node.numChildren(); i++) {
-          var child = node.childAt(i);
-          if (child.tag_ == 'Activity') {
+        for (var i = 0; i < node.childNodes.length; i++) {
+          var child = node.childNodes[i];
+          console.log(child);
+          if (child.tagName == 'Activity') {
             this.maybeAddActivity_(child);
-          } else if (child.tag_ == 'MultiSportSession') {
-            for (var j = 0; j < child.numChildren(); j++) {
-              var grandChild = child.childAt(j);
-              if (grandChild.tag_ == 'FirstSport' || grandChild.tag_ == 'NextSport') {
+          } else if (child.tagName == 'MultiSportSession') {
+            for (var j = 0; j < child.childNodes.length; j++) {
+              var grandChild = child.childNodes[j];
+              if (grandChild.tagName == 'FirstSport' || grandChild.tagName == 'NextSport') {
                 // There should only be a single child, of type Activity.
-                var greatGrandChild = grandChild.childAt(0);
-                if (greatGrandChild.tag_ != 'Activity') {
-                  throw new Error('Unexpected tag \'' + greatGrandChild.tag_ + '\' in \'' + grandChild.tag_ + '\'');
+                var greatGrandChild = grandChild.childNodes[0];
+                if (greatGrandChild.tagName != 'Activity') {
+                  throw new Error('Unexpected tag \'' + greatGrandChild.tagName + '\' in \'' + grandChild.tagName + '\'');
                 }
                 this.maybeAddActivity_(greatGrandChild);
               }
             }
-          } else {
-            throw new Error('Unexpected tag \'' + child.tag_ + '\' in \'Activities\'');
+          } else if (child.nodeName !== "#text") {
+            throw new Error('Unexpected tag \'' + child.tagName + '\' in \'Activities\'');
           }
         }
         this.rebuildDom();
@@ -464,7 +466,7 @@
       Activities.prototype.toXml = function() {
         var node = new Node('Activities');
         for (var i = 0; i < this.activities_.length; i++) {
-          node.children_.push(this.activities_[i].toXml());
+          node.childNodes.push(this.activities_[i].toXml());
         }
         return node;
       };
@@ -472,14 +474,14 @@
       //////////////////////////////////////////////////////////////////////////
       // Activity
       Activity = function(node) {
-        this.sport_ = node.params_['Sport'];
-        this.id_ = node.firstChildOfType('Id').data_;
+        this.sport_ = node.getAttribute('Sport');
+        this.id_ = node.getElementsByTagName('Id')[0].textContent;
         this.laps_ = [];
-        for (var i = 0; i < node.numChildren(); i++) {
-          if (node.childAt(i).tag_ == 'Lap') {
+        for (var i = 0; i < node.childNodes.length; i++) {
+          if (node.childNodes[i].tagName == 'Lap') {
             // For now, skip laps with no GPS data (ie no tracks)
             // TODO: Consider handling them.
-            var lap = new Lap(this, node.childAt(i));
+            var lap = new Lap(this, node.childNodes[i]);
             if (lap.tracks_.length > 0) {
               lap.rebuildDom()
               this.laps_.push(lap);
@@ -654,10 +656,10 @@
       };
       Activity.prototype.toXml = function() {
         var node = new Node('Activity');
-        node.params_['Sport'] = this.sport_;
-        node.children_.push(new Node('Id', this.id_));
+        node.setAttribute('Sport', this.sport_);
+        node.childNodes.push(new Node('Id', this.id_));
         for (var i = 0; i < this.laps_.length; i++) {
-          node.children_.push(this.laps_[i].toXml());
+          node.childNodes.push(this.laps_[i].toXml());
         }
         return node;
       };
@@ -667,15 +669,15 @@
       Lap = function(parentActivity, node) {
         this.parentActivity_ = parentActivity;
         // Metadata
-        this.startTime_ = node.params_['StartTime'];
-        this.totalTimeSeconds_ = Number(node.firstChildOfType('TotalTimeSeconds').data_).valueOf();
-        this.distanceMeters_ = Number(node.firstChildOfType('DistanceMeters').data_).valueOf();
-        this.maximumSpeed_ = Number(node.firstChildOfType('MaximumSpeed').data_).valueOf();
-        this.calories_ = Number(node.firstChildOfType('Calories').data_).valueOf();
+        this.startTime_ = node.getAttribute('StartTime');
+        this.totalTimeSeconds_ = Number(node.getElementsByTagName('TotalTimeSeconds')[0].textContent).valueOf();
+        this.distanceMeters_ = Number(node.getElementsByTagName('DistanceMeters')[0].textContent).valueOf();
+        this.maximumSpeed_ = Number(node.getElementsByTagName('MaximumSpeed')[0].textContent).valueOf();
+        this.calories_ = Number(node.getElementsByTagName('Calories')[0].textContent).valueOf();
         this.tracks_ = [];
-        for (var i = 0; i < node.numChildren(); i++) {
-          if (node.childAt(i).tag_ == 'Track') {
-            this.tracks_.push(new Track(node.childAt(i)));
+        for (var i = 0; i < node.childNodes.length; i++) {
+          if (node.childNodes[i].tagName == 'Track') {
+            this.tracks_.push(new Track(node.childNodes[i]));
           }
         }
         this.dom_ = createDiv('');
@@ -908,13 +910,13 @@
       }
       Lap.prototype.toXml = function() {
         var node = new Node('Lap');
-        node.params_['StartTime'] = this.startTime_;
-        node.children_.push(new Node('TotalTimeSeconds', this.totalTimeSeconds_));
-        node.children_.push(new Node('DistanceMeters', this.distanceMeters_));
-        node.children_.push(new Node('MaximumSpeed', this.maximumSpeed_));
-        node.children_.push(new Node('Calories', this.calories_));
+        node.setAttribute('StartTime', this.startTime_);
+        node.childNodes.push(new Node('TotalTimeSeconds', this.totalTimeSeconds_));
+        node.childNodes.push(new Node('DistanceMeters', this.distanceMeters_));
+        node.childNodes.push(new Node('MaximumSpeed', this.maximumSpeed_));
+        node.childNodes.push(new Node('Calories', this.calories_));
         for (var i = 0; i < this.tracks_.length; i++) {
-          node.children_.push(this.tracks_[i].toXml());
+          node.childNodes.push(this.tracks_[i].toXml());
         }
         return node;
       };
@@ -924,8 +926,9 @@
       Track = function(node) {
         this.trackpoints_ = [];
         // No metadata and all children are type Trackpoint
-        for (var i = 0; i < node.numChildren(); i++) {
-          this.trackpoints_.push(new Trackpoint(node.childAt(i)));
+        var trackpoints = node.getElementsByTagName('Trackpoint');
+        for (var i = 0; i < trackpoints.length; i++) {
+          this.trackpoints_.push(new Trackpoint(trackpoints[i]));
         }
         if (this.trackpoints_.length == 0) {
           throw new Error('No viable trackpoints found');
@@ -1025,7 +1028,7 @@
       Track.prototype.toXml = function() {
         var node = new Node('Track');
         for (var i = 0; i < this.trackpoints_.length; i++) {
-          node.children_.push(this.trackpoints_[i].toXml());
+          node.childNodes.push(this.trackpoints_[i].toXml());
         }
         return node;
       };
@@ -1033,28 +1036,28 @@
       //////////////////////////////////////////////////////////////////////////
       // Trackpoint
       Trackpoint = function(node) {
-        this.time_ = node.firstChildOfType('Time').data_;
-        if (node.numChildren() == 1) {
+        this.time_ = node.getElementsByTagName('Time')[0].textContent;
+        if (node.getElementsByTagName('Position').length === 0) {
           this.isTimeOnly_ = true;
           return;
         }
         this.isTimeOnly_ = false;
-        var position = node.firstChildOfType('Position');
-        this.latitudeDegrees_ = Number(position.firstChildOfType('LatitudeDegrees').data_).valueOf();
-        this.longitudeDegrees_ = Number(position.firstChildOfType('LongitudeDegrees').data_).valueOf();
-        this.altitudeMeters_ = Number(node.firstChildOfType('AltitudeMeters').data_).valueOf();
-        this.distanceMeters_ = Number(node.firstChildOfType('DistanceMeters').data_).valueOf();
+        var position = node.getElementsByTagName('Position')[0];
+        this.latitudeDegrees_ = Number(position.getElementsByTagName('LatitudeDegrees')[0].textContent).valueOf();
+        this.longitudeDegrees_ = Number(position.getElementsByTagName('LongitudeDegrees')[0].textContent).valueOf();
+        this.altitudeMeters_ = Number(node.getElementsByTagName('AltitudeMeters')[0].textContent).valueOf();
+        this.distanceMeters_ = Number(node.getElementsByTagName('DistanceMeters')[0].textContent).valueOf();
       };
       Trackpoint.prototype.toXml = function() {
         var node = new Node('Trackpoint');
-        node.children_.push(new Node('Time', this.time_));
+        node.childNodes.push(new Node('Time', this.time_));
         if (!this.isTimeOnly_) {
           var position = new Node('Position');
-          position.children_.push(new Node('LatitudeDegrees', this.latitudeDegrees_));
-          position.children_.push(new Node('LongitudeDegrees', this.longitudeDegrees_));
-          node.children_.push(position);
-          node.children_.push(new Node('AltitudeMeters', this.altitudeMeters_));
-          node.children_.push(new Node('DistanceMeters', this.distanceMeters_));
+          position.childNodes.push(new Node('LatitudeDegrees', this.latitudeDegrees_));
+          position.childNodes.push(new Node('LongitudeDegrees', this.longitudeDegrees_));
+          node.childNodes.push(position);
+          node.childNodes.push(new Node('AltitudeMeters', this.altitudeMeters_));
+          node.childNodes.push(new Node('DistanceMeters', this.distanceMeters_));
         }
         return node;
       };
