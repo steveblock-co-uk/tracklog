@@ -238,8 +238,8 @@
         }
       };
       Activities.prototype.addFromXml = function(node) {
-	// Children may be Activity or MultiSportSession. For the latter, we
-	// just pull out the Activity objects.
+        // Children may be Activity or MultiSportSession. For the latter, we
+        // just pull out the Activity objects.
         // TODO: Introduce concept of MultiSportSession?
         for (var i = 0; i < node.childNodes.length; i++) {
           var child = node.childNodes[i];
@@ -298,9 +298,9 @@
         }
       };
       Activities.prototype.removeActivity = function(index) {
-	// Removing an activitiy is easy, because the activity has no metadata.
-	// The laps from this activity therefore remain independent of the laps
-	// from the previous activity and no modification is required.
+        // Removing an activitiy is easy, because the activity has no metadata.
+        // The laps from this activity therefore remain independent of the laps
+        // from the previous activity and no modification is required.
         console.log('Removing activity ' + index);
         removeIndex(this.activities_, index);
         this.rebuildDom();
@@ -431,8 +431,8 @@
       };
       Activity.prototype.removeLap = function(index) {
         console.log('Removing lap ' + index);
-	// When removing a lap, we need to shift the distances of all later
-	// laps and update the time and distance for the lap.
+        // When removing a lap, we need to shift the distances of all later
+        // laps and update the time and distance for the lap.
         var distance = this.laps_[index].distanceMeters_;
         for (var i = index + 1; i < this.laps_.length; i++) {
           console.log('Shifting lap ' + (i + 1) + ' by ' + distance);
@@ -556,11 +556,11 @@
           var div = createDiv('track wide');
           div.appendChild(createTextSpan('Track ' + (i + 1) +' of ' + this.tracks_.length +
               (this.tracks_[i].isTimeOnly() ? ' (time-only)' : '')));
-	  // Always allow removal of time-only tracks. Only allow removal of
-	  // non-time-only tracks when there are other non-time-only tracks.
-	  // This means that if we start with non-time-only tracks, there will
-	  // always be at least one track remaining, at least one of which will
-	  // be non-time-only.
+          // Always allow removal of time-only tracks. Only allow removal of
+          // non-time-only tracks when there are other non-time-only tracks.
+          // This means that if we start with non-time-only tracks, there will
+          // always be at least one track remaining, at least one of which will
+          // be non-time-only.
           if (this.tracks_[i].isTimeOnly() || this.tracks_.length - this.numTimeOnlyTracks() > 1) {
             div.appendChild(createButton(
                 'Remove',
@@ -594,8 +594,8 @@
       Lap.prototype.removeTrack = function(index) {
         console.log('Removing track ' + index);
         var track = this.tracks_[index];
-	// When removing a track, we need to shift the distances of all later
-	// tracks and update the time and distance for the lap.
+        // When removing a track, we need to shift the distances of all later
+        // tracks and update the time and distance for the lap.
         if (!track.isTimeOnly()) {
           var distance = track.firstNonTimeOnlyTrackpoint().distanceMeters_ -
               track.lastNonTimeOnlyTrackpoint().distanceMeters_;
@@ -636,8 +636,8 @@
         return res;
       }
       Lap.prototype.calculateDistance = function() {
-	// This will be correct even if the first track does not start at
-	// distance zero.
+        // This will be correct even if the first track does not start at
+        // distance zero.
         return this.lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint().distanceMeters_ -
             this.firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
       };
