@@ -124,11 +124,6 @@
         }
         return tr;
       }
-      function createListItem(text) {
-        var li = document.createElement('li');
-        li.innerText = text;
-        return li;
-      }
       function createTextElement(type, value) {
         var element = document.createElementNS(null, type);
         element.textContent = value;
@@ -321,7 +316,7 @@
         var distance = previousActivity.distance();
         for (var i = 0; i < thisActivity.laps_.length; i++) {
           var lap = thisActivity.laps_[i];
-          // Update distances for each added lap. Note that we just shift, we don't fix inconsistencies.
+          // Update distances for each added lap.
           // TODO: Add ability to insert distance equal to approx displacement.
           lap.shiftDistances(distance);
           previousActivity.laps_.push(lap);
@@ -389,38 +384,6 @@
       Activity.prototype.lastLap = function() {
         return this.laps_[this.laps_.length - 1];
       }
-      Activity.prototype.isConsistent = function(errorMessages) {
-        var result = true;
-        // Check distance starts at zero
-        var distance = this.firstLap().firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
-        if (distance != 0) {
-          errorMessages.push('First lap does not start at zero: ' + distance + 'm');
-          result = false;
-        }
-        // Check distance continuity between laps.
-        for (var i = 1; i < this.laps_.length; i++) {
-          var prev = this.laps_[i - 1].lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint().distanceMeters_;
-          var next = this.laps_[i].firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
-          if (prev != next) {
-            errorMessages.push('Distance inconsistency between laps ' + i + ' and ' +
-                               (i + 1) + ': ' + prev / 1000 + 'km vs ' + next / 1000 + 'km');
-            result = false;
-          }
-        }
-        return result;
-      }
-      Activity.prototype.fixInconsistencies = function() {
-        var offset = - this.firstLap().firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
-        console.log('Shifting lap 0 by distance ' + offset);
-        this.firstLap().shiftDistances(offset);
-        for (var i = 1; i < this.laps_.length; i++) {
-          var offset = this.laps_[i - 1].lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint().distanceMeters_ -
-              this.laps_[i].firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
-          console.log('Shifting lap ' + (i + 1) + ' by distance ' + offset);
-          this.laps_[i].shiftDistances(offset);
-        }
-        this.rebuildDom();
-      }
       Activity.prototype.rebuildDom = function() {
         this.dom_.innerHTML = '';
         this.dom_.appendChild(createTextSpan('Sport'));
@@ -434,20 +397,6 @@
         id.size = 50;
         id.onchange = (function(activity) { return function() { activity.id_ = this.value; }; })(this);
         this.dom_.appendChild(id);
-        var errors = [];
-        if (!this.isConsistent(errors)) {
-          var div = createDiv('errors');
-          div.appendChild(createTextSpan('Inconsistencies detected'));
-          div.appendChild(createButton(
-              'Fix',
-              (function(me) { return function() { me.fixInconsistencies(); }; })(this)));
-          var ul = document.createElement('ul');
-          for (var i = 0; i < errors.length; i++) {
-            ul.appendChild(createListItem(errors[i]));
-          }
-          div.appendChild(ul);
-          this.dom_.appendChild(div);
-        }
         for (var i = 0; i < this.laps_.length; i++) {
           // Lap
           var div = createDiv('lap wide');
@@ -506,12 +455,12 @@
         if (previousLap.lastTrack().isTimeOnly()) {
           previousLap.removeTrack(previousLap.tracks_.length - 1);
         }
-        // We don't modify any distances. If they're consistent, they'll stay that way.
         // TODO: Add ability to insert distance equal to approx displacement.
         for (var i = 0; i < thisLap.tracks_.length; i++) {
           previousLap.tracks_.push(thisLap.tracks_[i]);
         }
-        // Note this will magically fix inconsistencies in the merged lap.
+        // Note this will magically fix inconsistencies in the metadata of the
+        // merged lap.
         previousLap.updateMetadata();
         // TODO: max speed should be part of updateMetadata.
         previousLap.maximumSpeed_ = Math.max(thisLap.maximumSpeed_, previousLap.maximumSpeed_);
@@ -602,20 +551,6 @@
         table.appendChild(createTableRow('Maximum speed (m/s)', [this.maximumSpeed_]));
         table.appendChild(createTableRow('Calories', [this.calories_]));
         this.dom_.appendChild(table);
-        var errors = [];
-        if (!this.isConsistent(errors)) {
-          var div = createDiv('errors');
-          div.appendChild(createTextSpan('Inconsistencies detected'));
-          div.appendChild(createButton(
-              'Fix',
-              (function(me) { return function() { me.fixInconsistencies(); }; })(this)));
-          var ul = document.createElement('ul');
-          for (var i = 0; i < errors.length; i++) {
-            ul.appendChild(createListItem(errors[i]));
-          }
-          div.appendChild(ul);
-          this.dom_.appendChild(div);
-        }
         for (var i = 0; i < this.tracks_.length; i++) {
           // Track
           var div = createDiv('track wide');
@@ -676,7 +611,6 @@
         // TODO: Make an estimate of how to update calories?
         this.rebuildDom();
       };
-      // This only shifts, it does not fix (distance) inconsistencies.
       Lap.prototype.shiftDistances = function(delta) {
         if (delta == 0) {
           return;
@@ -707,73 +641,6 @@
         return this.lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint().distanceMeters_ -
             this.firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
       };
-      Lap.prototype.fixInconsistencies = function() {
-        var prevIndex = -1;
-        var nextIndex = -1;
-        var offset;
-        for (var i = 0; i < this.tracks_.length; i++) {
-          var track = this.tracks_[i];
-          if (!track.isTimeOnly()) {
-            nextIndex = i;
-            if (prevIndex != -1) {
-              offset = this.tracks_[prevIndex].lastNonTimeOnlyTrackpoint().distanceMeters_ -
-                  this.tracks_[nextIndex].firstNonTimeOnlyTrackpoint().distanceMeters_;
-              console.log('Shifting track ' + (i + 1) + ' by distance ' + offset);
-              this.tracks_[i].shiftDistances(offset);
-            }
-            prevIndex = nextIndex;
-          }
-        }
-        // This must be done after fixing the tracks.
-        this.updateMetadata();
-        this.rebuildDom();
-        // We also need to update all later laps by shifting their distance by the last offset we used.
-        if (offset != undefined) {
-          this.parentActivity_.shiftDistanceOfAllLaterLaps(this, offset);
-        }
-      }
-      Lap.prototype.isConsistent = function(errorMessages) {
-        var result = true;
-        // Check metadata
-        // TODO: Remove these checks
-/*
-        if (this.startTime_ != this.firstTrack().firstTrackpoint().time_) {
-          errorMessages.push('Start time inconsistent: ' + this.startTime_ +
-                             ' vs ' + this.firstTrack().firstTrackpoint().time_);
-          result = false;
-        }
-	// Total time field uses decimals, but time stamps do not, so sum from
-	// timestamps can be off by up to a second for each track.
-	// TODO: Technically, if a track has only one trackpoint, it can't
-	// contribute any error, so we should account for this.
-        if (Math.abs(this.totalTimeSeconds_ - this.calculateTotalTime()) > this.tracks_.length) {
-          errorMessages.push('Total time inconsistent: ' + this.totalTimeSeconds_ +
-                             's vs ' + this.calculateTotalTime() + 's');
-          result = false;
-        }
-*/
-        if (Math.abs(this.distanceMeters_ - this.calculateDistance()) > 0.1) {
-          errorMessages.push('Distance inconsistent: ' + this.distanceMeters_ +
-                             'm vs ' + this.calculateDistance() + 'm');
-          result = false;
-        }
-        // TODO: Check maximum speed
-        // Check distances are continuous
-        for (var i = 1; i < this.tracks_.length; i++) {
-          var start = this.tracks_[i - 1];
-          var end = this.tracks_[i];
-          if (!start.isTimeOnly() && !end.isTimeOnly()) {
-              var prev = start.lastNonTimeOnlyTrackpoint().distanceMeters_;
-              var next = end.firstNonTimeOnlyTrackpoint().distanceMeters_;
-            if (prev != next) {
-              errorMessages.push('Distance inconsistency between tracks ' + i + ' and ' +
-                                 (i + 1) + ': ' + prev / 1000 + 'km vs ' + next / 1000 + 'km');
-              result = false;
-            }
-          }
-        }
-        return result;
-      }
       Lap.prototype.toXml = function() {
         var node = document.createElementNS(null, 'Lap');
         node.setAttribute('StartTime', this.startTime_);
@@ -879,7 +746,6 @@
             'Start/End longitude (deg)',
             [first.longitudeDegrees_, last.longitudeDegrees_]));
       };
-      // This only shifts, it does not fix (distance) inconsistencies.
       Track.prototype.shiftDistances = function(delta) {
         if (delta == 0) {
           return;
@@ -965,15 +831,6 @@
       }
       span {
         margin-right: 10px;
-      }
-      div.errors {
-        color: red;
-        border: 1px solid red;
-        margin: 4px;
-        padding: 4px;
-      }
-      div.errors ul {
-        margin: 0px;
       }
       a#dumpLink {
         visibility: hidden;
