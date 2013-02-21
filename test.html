@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="utils.js"></script>
+    <script type="text/javascript" src="activities.js"></script>
+    <script type="text/javascript" src="activity.js"></script>
+    <script type="text/javascript" src="lap.js"></script>
+    <script type="text/javascript" src="track.js"></script>
+    <script type="text/javascript" src="test.js"></script>
+    <script type="text/javascript">
+      var trackpoint1 = {
+        timestamp: '2013-01-01T00:00:00Z',
+        distance: 1,
+        latitude: 2,
+        longitude: 3
+      };
+      var trackpoint2 = {
+        timestamp: '2013-01-01T00:00:01Z',
+        distance: 4,
+        latitude: 5,
+        longitude: 6
+      };
+      var trackpoint3 = {
+        timestamp: '2013-01-01T00:00:02Z',
+        distance: 7,
+        latitude: 8,
+        longitude: 9
+      };
+      var timeOnlyTrackpoint = {timestamp: '2013-01-01T00:00:03Z'};
+      var track1 = {trackpoints: [trackpoint1, trackpoint2]};
+      var track2 = {trackpoints: [trackpoint3]};
+      var timeOnlyTrack = {trackpoints: [timeOnlyTrackpoint]};
+      var mixedTrack1 = {trackpoints: [trackpoint1, timeOnlyTrackpoint]};
+      var mixedTrack2 = {trackpoints: [
+        trackpoint1,
+        timeOnlyTrackpoint,
+        trackpoint2
+      ]};
+      var emptyTrack = {trackpoints: []};
+      var lap1 = {
+        startTime: '2013-01-01T00:00:04Z',
+        time: 10,
+        length: 11,
+        maxSpeed: 12,
+        calories: 13,
+        tracks: [track1],
+      };
+      var lap2 = {
+        startTime: '2013-01-01T00:00:05Z',
+        time: 14,
+        length: 15,
+        maxSpeed: 16,
+        calories: 17,
+        tracks: [track2],
+      };
+      var lap3 = {
+        startTime: '2013-01-01T00:00:06Z',
+        time: 18,
+        length: 19,
+        maxSpeed: 20,
+        calories: 21,
+        tracks: [mixedTrack1, track1, track2],
+      };
+      var timeOnlyLap = {
+        startTime: '2013-01-01T00:00:07Z',
+        time: 22,
+        length: 23,
+        maxSpeed: 24,
+        calories: 25,
+        tracks: [timeOnlyTrack],
+      };
+      var mixedLap1 = {
+        startTime: '2013-01-01T00:00:08Z',
+        time: 26,
+        length: 27,
+        maxSpeed: 28,
+        calories: 29,
+        tracks: [track1, timeOnlyTrack],
+      };
+      var mixedLap2 = {
+        startTime: '2013-01-01T00:00:09Z',
+        time: 30,
+        length: 31,
+        maxSpeed: 32,
+        calories: 33,
+        tracks: [track1, timeOnlyTrack, track2],
+      };
+      var mixedLap3 = {
+        startTime: '2013-01-01T00:00:10',
+        time: 34,
+        length: 35,
+        maxSpeed: 36,
+        calories: 37,
+        tracks: [timeOnlyTrack, track2, timeOnlyTrack],
+      };
+      var emptyLap = {
+        startTime: '2013-01-01T00:00:11',
+        time: 38,
+        length: 39,
+        maxSpeed: 40,
+        calories: 41,
+        tracks: [],
+      };
+      var activity1 = {laps: [lap1, lap2]};
+      var activity2 = {laps: [lap1]};
+      var timeOnlyActivity = {laps: [timeOnlyLap]};
+      var mixedActivity1 = {laps: [lap1, timeOnlyLap]};
+      var mixedActivity2 = {laps: [lap1, timeOnlyLap, lap2]};
+      var mixedActivity3 = {laps: [mixedLap1, mixedLap3]};
+      var mixedActivity4 = {laps: [timeOnlyLap, lap2]};
+      var emptyActivity = {laps: []};
+
+      function runTests() {
+        // Test basic use.
+        var xml = createXml([activity1]);
+        checkXml(createActivities(xml).toXml(), xml,
+            'Test basic use');
+
+        // Activities
+        // Test no activities works as expected.
+        var xml = createXml([]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test no activities');
+
+        // Test time-only activity at start/end works as expected.
+        var xml = createXml([activity1, timeOnlyActivity]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test time-only activity at start/end');
+
+        // Test time-only activity in middle works as expected.
+        var xml = createXml([activity1, timeOnlyActivity, activity2]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test time-only activity in middle');
+
+        // Test only time-only activity works as expected.
+        var xml = createXml([timeOnlyActivity]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test only time-only activities');
+
+        // Activity
+        // Test no laps causes the activity to be skipped.
+        var xml = createXml([emptyActivity]);
+        checkXml(createActivities(xml).toXml(), createXml([]),
+          'Test no laps');
+
+	// Test time-only lap at start/end works as expected.
+        var xml = createXml([mixedActivity1]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test time-only lap at start/end');
+
+	// Test time-only lap in middle works as expected.
+        var xml = createXml([mixedActivity2]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test time-only lap in middle');
+
+        // Lap
+        // Test no tracks works as expected.
+        var xml = createXml([{laps: [emptyLap]}]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test no tracks');
+
+        // Test time-only track at start/end works as expected.
+        var xml = createXml([{laps: [mixedLap1]}]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test time-only track at start/end');
+
+        // Test time-only track in middle throws an exception.
+        var xml = createXml([{laps: [mixedLap2]}]);
+        try {
+          createActivities(xml);
+          fail('Test time-only track in middle');
+        } catch(e) {
+          pass('Test time-only track in middle');
+        }
+
+        // Track
+        // Test no trackpoints throws an exception.
+        var xml = createXml([{laps: [{
+          startTime: '2013-01-01T00:00:06Z',
+          time: 12,
+          length: 13,
+          maxSpeed: 14,
+          calories: 15,
+          tracks: [emptyTrack],
+        }]}]);
+        try {
+          createActivities(xml);
+          fail('Test no trackpoints');
+        } catch(e) {
+          pass('Test no trackpoints');
+        }
+
+        // Test time-only trackpoint at end works as expected.
+        var xml = createXml([{laps: [{
+          startTime: '2013-01-01T00:00:06Z',
+          time: 12,
+          length: 13,
+          maxSpeed: 14,
+          calories: 15,
+          tracks: [mixedTrack1],
+        }]}]);
+        checkXml(createActivities(xml).toXml(), xml,
+          'Test time-only trackpoint at end');
+
+        // Test time-only trackpoint in middle throws an exception.
+        var xml = createXml([{laps: [{
+          startTime: '2013-01-01T00:00:06Z',
+          time: 12,
+          length: 13,
+          maxSpeed: 14,
+          calories: 15,
+          tracks: [mixedTrack2],
+        }]}]);
+        try {
+          createActivities(xml);
+          pass('Test time-only trackpoint in middle');
+        } catch(e) {
+          pass('Test time-only trackpoint in middle');
+        }
+
+        // Removal
+        // Test removing the end track.
+        var json = clone([{laps: [lap3]}]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].laps_[0].removeTrack(2);
+        removeIndex(json[0].laps[0].tracks, 2);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing the end track');
+
+        // Test removing a track.
+        var json = clone([{laps: [lap3]}]);
+        var activities = createActivities(createXml(json));
+	var length = activities.activities_[0].laps_[0].tracks_[1].length();
+	var time = activities.activities_[0].laps_[0].tracks_[1].time();
+        activities.activities_[0].laps_[0].removeTrack(1);
+        // Last track has only 1 trackpoint.
+        json[0].laps[0].tracks[2].trackpoints[0].distance -= length;
+        json[0].laps[0].length -= length;
+        json[0].laps[0].time -= time;
+        removeIndex(json[0].laps[0].tracks, 1);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing a track');
+
+        // Test removing a track with a follow-on lap.
+        var json = clone([{laps: [lap3, lap2]}]);
+        var activities = createActivities(createXml(json));
+	var length = activities.activities_[0].laps_[0].tracks_[1].length();
+	var time = activities.activities_[0].laps_[0].tracks_[1].time();
+        activities.activities_[0].laps_[0].removeTrack(1);
+        // Last track in first lap has only 1 trackpoint.
+        json[0].laps[0].tracks[2].trackpoints[0].distance -= length;
+        json[0].laps[0].length -= length;
+        json[0].laps[0].time -= time;
+        // Second lap has only 1 track with only 1 trackpoint.
+        json[0].laps[1].tracks[0].trackpoints[0].distance -= length;
+        removeIndex(json[0].laps[0].tracks, 1);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing a track with a follow-on lap');
+
+        // Test removing the sole track.
+        var json = clone([activity2]);
+        var activities = createActivities(createXml(json));
+	var length = activities.activities_[0].laps_[0].tracks_[0].length();
+	var time = activities.activities_[0].laps_[0].tracks_[0].time();
+        activities.activities_[0].laps_[0].removeTrack(0);
+        json[0].laps[0].length -= length;
+        json[0].laps[0].time -= time;
+        removeIndex(json[0].laps[0].tracks, 0);
+        checkXml(activities.toXml(), createXml(json),
+            'Test removing the sole track');
+
+        // Test removing a time-only track.
+        var json = clone([{laps: [mixedLap3, lap2]}]);
+        var activities = createActivities(createXml(json));
+	var time = activities.activities_[0].laps_[0].tracks_[0].time();
+        activities.activities_[0].laps_[0].removeTrack(0);
+        json[0].laps[0].time -= time;
+        removeIndex(json[0].laps[0].tracks, 0);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing a time-only track');
+
+        // Test removing the end lap.
+        var json = clone([activity1]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].removeLap(1);
+        removeIndex(json[0].laps, 1);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing the end lap');
+
+        // Test removing a lap.
+        var json = clone([activity1]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].removeLap(0);
+        // Second lap has only 1 track, with only 1 trackpoint.
+	json[0].laps[1].tracks[0].trackpoints[0].distance -=
+            json[0].laps[0].length;
+        removeIndex(json[0].laps, 0);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing a lap');
+          
+        // Test removing the sole lap.
+        var json = clone([activity2]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].removeLap(0);
+        removeIndex(json[0].laps, 0);
+        checkXml(activities.toXml(), createXml(json),
+            'Test removing the sole lap');
+
+        // Test removing a time-only lap.
+        var json = clone([mixedActivity2]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].removeLap(1);
+        // Third lap has only 1 track, with only 1 trackpoint.
+	json[0].laps[2].tracks[0].trackpoints[0].distance -=
+            json[0].laps[1].length;
+        removeIndex(json[0].laps, 1);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing a time-only lap');
+
+        // Test removing the end activity.
+        var json = clone([activity1, activity2]);
+        var activities = createActivities(createXml(json));
+        activities.removeActivity(1);
+        removeIndex(json, 1);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing the end activity');
+
+        // Test removing an activity.
+        var json = clone([activity1, activity2]);
+        var activities = createActivities(createXml(json));
+        activities.removeActivity(0);
+        removeIndex(json, 0);
+        checkXml(activities.toXml(), createXml(json),
+          'Test removing an activity');
+
+        // Test removing the sole activity.
+        var json = clone([activity1]);
+        var activities = createActivities(createXml(json));
+        activities.removeActivity(0);
+        checkXml(activities.toXml(), createXml([]),
+          'Test removing the sole activity');
+
+        // Merging
+        // Test merging laps.
+        var json = clone([activity1]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].collapseLapWithPrevious(1);
+        json[0].laps[0].time += json[0].laps[1].time;
+        json[0].laps[0].length += json[0].laps[1].length;
+        json[0].laps[0].maxSpeed =
+	    Math.max(json[0].laps[0].maxSpeed, json[0].laps[1].maxSpeed);
+        json[0].laps[0].calories += json[0].laps[1].calories;
+	json[0].laps[0].tracks =
+            json[0].laps[0].tracks.concat(json[0].laps[1].tracks);
+        removeIndex(json[0].laps, 1);
+        checkXml(activities.toXml(), createXml(json),
+          'Test merging laps');
+
+        // Test merging with an empty lap.
+        var json = clone([{laps: [lap3, emptyLap, lap1]}]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].collapseLapWithPrevious(1);
+        json[0].laps[0].time += json[0].laps[1].time;
+        json[0].laps[0].length += json[0].laps[1].length;
+        json[0].laps[0].maxSpeed =
+	    Math.max(json[0].laps[0].maxSpeed, json[0].laps[1].maxSpeed);
+        json[0].laps[0].calories += json[0].laps[1].calories;
+        removeIndex(json[0].laps, 1);
+        checkXml(activities.toXml(), createXml(json),
+          'Test merging with an empty lap');
+
+	// Test that time-only tracks at the merge point are removed when
+	// merging laps.
+        var json = clone([mixedActivity3]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].collapseLapWithPrevious(1);
+        json[0].laps[0].time += json[0].laps[1].time;
+        json[0].laps[0].length += json[0].laps[1].length;
+        json[0].laps[0].maxSpeed =
+	    Math.max(json[0].laps[0].maxSpeed, json[0].laps[1].maxSpeed);
+        json[0].laps[0].calories += json[0].laps[1].calories;
+        removeIndex(json[0].laps[0].tracks, json[0].laps[0].tracks.length - 1);
+        removeIndex(json[0].laps[1].tracks, 0);
+	json[0].laps[0].tracks =
+            json[0].laps[0].tracks.concat(json[0].laps[1].tracks);
+        removeIndex(json[0].laps, 1);
+        checkXml(activities.toXml(), createXml(json),
+	    'Test that time-only tracks at the merge point are removed when '+
+            'merging laps');
+
+        // Test merging activities.
+        var json = clone([activity1, activity2]);
+        var activities = createActivities(createXml(json));
+        activities.collapseActivityWithPrevious(1);
+	var shift = 0;
+        for (var i = 0; i < json[0].laps.length; ++i) {
+          shift += json[0].laps[i].length;
+        }
+	// Second activity has only one lap, with only one track.
+        for (var i = 0; i < json[1].laps[0].tracks[0].trackpoints.length; ++i) {
+          json[1].laps[0].tracks[0].trackpoints[i].distance += shift;
+        }
+        json[0].laps = json[0].laps.concat(json[1].laps);
+        removeIndex(json, 1);
+        checkXml(activities.toXml(), createXml(json),
+	    'Test merging activities');
+
+	// Test that time-only laps are not removed when merging activities.
+        var json = clone([mixedActivity1, mixedActivity4]);
+        var activities = createActivities(createXml(json));
+        activities.collapseActivityWithPrevious(1);
+	var shift = 0;
+        for (var i = 0; i < json[0].laps.length; ++i) {
+          shift += json[0].laps[i].length;
+        }
+	// Second activity has only one non-time-only lap, with only one track.
+	for (var i = 0; i < json[1].laps[1].tracks[0].trackpoints.length; ++i) {
+          json[1].laps[1].tracks[0].trackpoints[i].distance += shift;
+        }
+        json[0].laps = json[0].laps.concat(json[1].laps);
+        removeIndex(json, 1);
+        checkXml(activities.toXml(), createXml(json),
+	    'Test that time-only laps are not removed when merging ' +
+            'activities');
+
+	// Test adding activities.
+        activities = createActivities(createXml([activity1]));
+        activities.addFromXml(createXml([activity2]));
+        checkXml(activities.toXml(), createXml([activity1, activity2]),
+	    'Test adding activities');
+
+	// Test adding activities to empty activity.
+        activities = createActivities(createXml([emptyActivity]));
+        activities.addFromXml(createXml([activity2]));
+        checkXml(activities.toXml(), createXml([emptyActivity, activity2]),
+	    'Test adding activities to empty activity');
+      }
+    </script>
+    <style type="text/css">
+      body {
+        font-family: Verdana, Geneva, sans-serif;
+        font-size: small;
+      }
+      body > div {
+        background-color: lime;
+        margin: 2px;
+        border: 1px solid grey;
+        padding: 1px;
+      }
+      body > div.fail {
+        background-color: red;
+      }
+    </style>
+  </head>
+  <body onload="runTests();">
+  <body>
+</html>

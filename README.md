@@ -49,7 +49,8 @@ Conclusions
 - A trackpoint can be time-only.
 - A track must have trackpoints, but can be time-only.
 - A track can have at most one time-only trackpoint at each end. So a
-  time-only track can have at most two time-only trackpoints.
+  track can have at most two time-only trackpoints and a time-only track can
+  have at most two (time-only) trackpoints.
 - A lap may have zero tracks, so can be time-only.
 - A lap can have at most one time-only track at each end.
 - Lap times and distances don't always match data from tracks.
@@ -67,7 +68,6 @@ Plan
 TODOs
 
 - Handle activities with zero laps
-- Add tests
 - Refactor to use MVC
 - Show tracks on map
 - Allow manual override of displacement for merging laps/activities - does this make sense?
