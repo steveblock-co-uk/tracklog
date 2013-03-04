@@ -10,10 +10,13 @@ Activity = function(node) {
   this.checkConsistency();
   this.dom_ = createDiv('');
 };
+Activity.prototype.isEmpty = function() {
+  return this.laps_.length === 0;
+}
 Activity.prototype.checkConsistency = function() {
   // Currently we ignore empty activities (though they are still created).
   // TODO: Fix this.
-  if (this.laps_.length === 0) {
+  if (this.isEmpty()) {
     console.log('WARNING: Empty activity at start time ' + this.startTime_);
   }
 };
@@ -55,7 +58,7 @@ Activity.prototype.length = function() {
   return length;
 };
 Activity.prototype.firstLap = function() {
-  if (this.laps_.length === 0) {
+  if (this.isEmpty()) {
     throw new Error('Can\'t get first lap of empty activity');
   }
   return this.laps_[0];
@@ -70,7 +73,7 @@ Activity.prototype.firstNonTimeOnlyLap = function() {
   return null;
 };
 Activity.prototype.lastLap = function() {
-  if (this.laps_.length === 0) {
+  if (this.isEmpty()) {
     throw new Error('Can\'t get last lap of empty activity');
   }
   return this.laps_[this.laps_.length - 1];
