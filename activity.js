@@ -107,6 +107,21 @@ Activity.prototype.displacementFrom = function(other) {
   }
   return this.firstNonTimeOnlyLap().displacementFrom(other.lastNonTimeOnlyLap());
 };
+Activity.prototype.startTime = function() {
+  if (this.isEmpty()) {
+    throw new Error('Can\'t get start time of empty activity');
+  }
+  return this.firstLap().startTime_;
+};
+Activity.prototype.endTime = function() {
+  if (this.isEmpty()) {
+    throw new Error('Can\'t get end time of empty activity');
+  }
+  return this.lastLap().endTime();
+};
+Activity.prototype.deltaTime = function() {
+  return (new Date(this.endTime()) - new Date(this.startTime())) / 1000;
+};
 Activity.prototype.rebuildDom = function() {
   this.dom_.innerHTML = '';
   this.dom_.appendChild(createTextSpan('Sport'));
@@ -121,7 +136,15 @@ Activity.prototype.rebuildDom = function() {
   id.onchange = (function(activity) { return function() { activity.id_ = this.value; }; })(this);
   this.dom_.appendChild(id);
   var table = document.createElement('table');
-  table.appendChild(createTableRow('Total time (HH:MM:SS)', [toHourMinSec(this.time())]));
+  // TODO: Would be good not to need to know details of startTime() and endTime().
+  if (!this.isEmpty() && !this.lastLap().isEmpty()) {
+    table.appendChild(createTableRow('Start : end : delta time', [
+      this.startTime(),
+      this.endTime(),
+      toHourMinSec(this.deltaTime()),
+    ]));
+  }
+  table.appendChild(createTableRow('Elapsed time (HH:MM:SS)', [toHourMinSec(this.time())]));
   table.appendChild(createTableRow('Length (km)', [this.length() / 1000]));
   table.appendChild(createTableRow(
       'Num laps : time-only',
