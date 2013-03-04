@@ -117,6 +117,18 @@ Lap.prototype.deltaTime = function() {
   // We use this.startTime_, rather than the first trackpoint time.
   return (new Date(this.endTime()) - new Date(this.startTime_)) / 1000;
 };
+Lap.prototype.startDistance = function() {
+  if (this.isTimeOnly()) {
+    throw new Error('Can\'t get start distance for time-only lap');
+  }
+  return this.firstNonTimeOnlyTrack().firstNonTimeOnlyTrackpoint().distanceMeters_;
+};
+Lap.prototype.endDistance = function() {
+  if (this.isTimeOnly()) {
+    throw new Error('Can\'t get end distance for time-only lap');
+  }
+  return this.lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint().distanceMeters_;
+};
 Lap.prototype.rebuildDom = function() {
   this.dom_.innerHTML = '';
   var table = document.createElement('table');
@@ -131,6 +143,13 @@ Lap.prototype.rebuildDom = function() {
     toHourMinSec(this.totalTimeSeconds_),
     toHourMinSec(this.summedTime()),
   ]));
+  if (!this.isTimeOnly()) {
+    table.appendChild(createTableRow('Start : end : delta distance (km)', [
+      this.startDistance() / 1000,
+      this.endDistance() / 1000,
+      (this.endDistance() - this.startDistance()) / 1000,
+    ]));
+  }
   table.appendChild(createTableRow('Length : summed (km)', [
     this.length_ / 1000,
     this.summedLength() / 1000,
