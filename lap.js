@@ -104,11 +104,30 @@ Lap.prototype.displacementFrom = function(other) {
   return this.firstNonTimeOnlyTrack().displacementFrom(
       other.lastNonTimeOnlyTrack());
 };
+Lap.prototype.endTime = function() {
+  if (this.isEmpty()) {
+    throw new Error('Can\'t get end time of empty lap');
+  }
+  return this.lastTrack().lastTrackpoint().timestamp_;
+};
+Lap.prototype.deltaTime = function() {
+  if (this.isEmpty()) {
+    throw new Error('Can\'t get delta time of empty lap');
+  }
+  // We use this.startTime_, rather than the first trackpoint time.
+  return (new Date(this.endTime()) - new Date(this.startTime_)) / 1000;
+};
 Lap.prototype.rebuildDom = function() {
   this.dom_.innerHTML = '';
   var table = document.createElement('table');
-  table.appendChild(createTableRow('Start time', [this.startTime_]));
-  table.appendChild(createTableRow('Total time : summed (HH:MM:SS)', [
+  if (!this.isEmpty()) {
+    table.appendChild(createTableRow('Start : end : delta time', [
+      this.startTime_,
+      this.endTime(),
+      toHourMinSec(this.deltaTime()),
+    ]));
+  }
+  table.appendChild(createTableRow('Elapsed time : summed (HH:MM:SS)', [
     toHourMinSec(this.totalTimeSeconds_),
     toHourMinSec(this.summedTime()),
   ]));
