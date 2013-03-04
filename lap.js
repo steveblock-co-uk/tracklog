@@ -24,8 +24,11 @@ Lap.prototype.checkConsistency = function() {
     }
   }
 };
+Lap.prototype.isEmpty = function() {
+  return this.tracks_.length === 0;
+}
 Lap.prototype.firstTrack = function() {
-  if (this.tracks_.length === 0) {
+  if (this.isEmpty()) {
     throw new Error('Can\'t get first track of empty lap');
   }
   return this.tracks_[0];
@@ -40,7 +43,7 @@ Lap.prototype.firstNonTimeOnlyTrack = function() {
   return null;
 };
 Lap.prototype.lastTrack = function() {
-  if (this.tracks_.length === 0) {
+  if (this.isEmpty()) {
     throw new Error('Can\'t get last track of empty lap');
   }
   return this.tracks_[this.tracks_.length - 1];
