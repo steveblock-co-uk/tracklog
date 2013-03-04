@@ -105,18 +105,18 @@ Lap.prototype.rebuildDom = function() {
   this.dom_.innerHTML = '';
   var table = document.createElement('table');
   table.appendChild(createTableRow('Start time', [this.startTime_]));
-  table.appendChild(createTableRow('Total time / summed (HH:MM:SS)', [
+  table.appendChild(createTableRow('Total time : summed (HH:MM:SS)', [
     toHourMinSec(this.totalTimeSeconds_),
     toHourMinSec(this.summedTime()),
   ]));
-  table.appendChild(createTableRow('Length / summed (km)', [
+  table.appendChild(createTableRow('Length : summed (km)', [
     this.length_ / 1000,
     this.summedLength() / 1000,
   ]));
   table.appendChild(createTableRow('Maximum speed (m/s)', [this.maximumSpeed_]));
   table.appendChild(createTableRow('Calories', [this.calories_]));
   table.appendChild(createTableRow(
-      'Num tracks / time-only',
+      'Num tracks : time-only',
       [this.tracks_.length, this.numTimeOnlyTracks()]));
   this.dom_.appendChild(table);
   for (var i = 0; i < this.tracks_.length; i++) {

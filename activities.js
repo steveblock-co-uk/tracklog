@@ -54,7 +54,7 @@ Activities.prototype.rebuildDom = function() {
   var table = document.createElement('table');
   // TODO: Consider providing meta data for set of activities.
   table.appendChild(createTableRow(
-      'Num activities / time-only',
+      'Num activities : time-only',
       [this.activities_.length, this.numTimeOnlyActivities()]));
   this.dom_.appendChild(table);
 

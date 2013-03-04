@@ -121,7 +121,7 @@ Activity.prototype.rebuildDom = function() {
   table.appendChild(createTableRow('Total time (HH:MM:SS)', [toHourMinSec(this.time())]));
   table.appendChild(createTableRow('Length (km)', [this.length() / 1000]));
   table.appendChild(createTableRow(
-      'Num laps / time-only',
+      'Num laps : time-only',
       [this.laps_.length, this.numTimeOnlyLaps()]));
   this.dom_.appendChild(table);
   for (var i = 0; i < this.laps_.length; i++) {
