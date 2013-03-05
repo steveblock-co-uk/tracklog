@@ -206,15 +206,15 @@ Activity.prototype.collapseLapWithPrevious = function(index) {
   }
   // Note that the length of this activity is calculated lazily.
   console.log('Collapsing lap ' + (index + 1) + ' with lap ' + index);
-  // Remove time-only tracks at the point of collapsing. There will be at most
-  // one at either end.
+  // Remove time-only tracks at the point of collapsing, provided other tracks
+  // exist. There will be at most one at either end.
   // TODO: Do we want to do this? If not, we need to update Lap.checkConsistency().
   var thisLap = this.laps_[index];
-  if (thisLap.firstTrack().isTimeOnly()) {
+  if (thisLap.tracks_.length > 1 && thisLap.firstTrack().isTimeOnly()) {
     thisLap.removeTrack(0);
   }
   var previousLap = this.laps_[index - 1];
-  if (previousLap.lastTrack().isTimeOnly()) {
+  if (previousLap.tracks_.length > 1 && previousLap.lastTrack().isTimeOnly()) {
     previousLap.removeTrack(previousLap.tracks_.length - 1);
   }
   previousLap.totalTimeSeconds_ += thisLap.totalTimeSeconds_;

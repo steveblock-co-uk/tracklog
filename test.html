@@ -356,6 +356,21 @@
         checkXml(activities.toXml(), createXml(json),
           'Test merging laps');
 
+        // Test merging with a time-only lap.
+        var json = clone([mixedActivity2]);
+        var activities = createActivities(createXml(json));
+        activities.activities_[0].collapseLapWithPrevious(2);
+        json[0].laps[1].time += json[0].laps[2].time;
+        json[0].laps[1].length += json[0].laps[2].length;
+        json[0].laps[1].maxSpeed =
+	    Math.max(json[0].laps[1].maxSpeed, json[0].laps[2].maxSpeed);
+        json[0].laps[1].calories += json[0].laps[2].calories;
+	json[0].laps[1].tracks =
+            json[0].laps[1].tracks.concat(json[0].laps[2].tracks);
+        removeIndex(json[0].laps, 2);
+        checkXml(activities.toXml(), createXml(json),
+          'Test merging with a time-only lap');
+
         // Test merging with an empty lap.
         var json = clone([{laps: [lap3, emptyLap, lap1]}]);
         var activities = createActivities(createXml(json));
