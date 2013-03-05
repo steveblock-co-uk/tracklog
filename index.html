@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <script type="text/javascript" src="utils.js"></script>
     <script type="text/javascript" src="activities.js"></script>
     <script type="text/javascript" src="activity.js"></script>
     <script type="text/javascript" src="lap.js"></script>
@@ -33,16 +34,6 @@
             padWithLeadingZeros(mins, 2) + ':' +
             padWithLeadingZeros(secs, 2);
       }
-      function removeIndex(array, index) {
-        if (index < 0 || index >= array.length) {
-          throw new Error('Can not remove index ' + index);
-        }
-        for (var i = index; i < array.length - 1; i++) {
-          array[i] = array[i + 1];
-        }
-        delete array[array.length - 1];
-        array.length--;
-      }
       function createDiv(className) {
         var div = document.createElement('div');
         div.className = className;
@@ -72,14 +63,6 @@
           tr.appendChild(td);
         }
         return tr;
-      }
-      function createTextElement(type, value) {
-        var element = document.createElementNS(null, type);
-        element.textContent = value;
-        return element;
-      }
-      function toNumber(element) {
-        return Number(element.textContent).valueOf();
       }
 
       //////////////////////////////////////////////////////////////////////////
