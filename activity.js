@@ -1,4 +1,5 @@
 Activity = function(node) {
+  // All time and distance metadata is held by Lap.
   this.sport_ = node.getAttribute('Sport');
   this.id_ = node.getElementsByTagName('Id')[0].textContent;
   this.laps_ = [];
@@ -7,19 +8,11 @@ Activity = function(node) {
       this.laps_.push(new Lap(this, node.childNodes[i]));
     }
   }
-  this.checkConsistency();
   this.dom_ = createDiv('');
 };
 Activity.prototype.isEmpty = function() {
   return this.laps_.length === 0;
 }
-Activity.prototype.checkConsistency = function() {
-  // Currently we ignore empty activities (though they are still created).
-  // TODO: Fix this.
-  if (this.isEmpty()) {
-    console.log('WARNING: Empty activity at start time ' + this.startTime_);
-  }
-};
 Activity.prototype.onChildLapDistanceChanged = function(lap, delta) {
   // Shift all later laps by distance delta. Note that this activity's length
   // is calculated lazily.
@@ -154,12 +147,9 @@ Activity.prototype.rebuildDom = function() {
     // Lap
     var div = createDiv('lap wide');
     div.appendChild(createTextSpan('Lap ' + (i + 1) + ' of ' + this.laps_.length));
-    // TODO: Handle empty activities.
-    if (this.laps_.length > 1) {
-      div.appendChild(createButton(
-          'Remove',
-          (function(me, j) { return function() { me.removeLap(j); }; })(this, i)));
-    }
+    div.appendChild(createButton(
+        'Remove',
+        (function(me, j) { return function() { me.removeLap(j); }; })(this, i)));
     this.laps_[i].rebuildDom();
     div.appendChild(this.laps_[i].dom_);
     this.dom_.appendChild(div);

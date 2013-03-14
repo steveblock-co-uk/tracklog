@@ -138,10 +138,9 @@
           'Test only time-only activities');
 
         // Activity
-        // Test no laps causes the activity to be skipped.
+        // Test no laps works as expected.
         var xml = createXml([emptyActivity]);
-        checkXml(createActivities(xml).toXml(), createXml([]),
-          'Test no laps');
+	checkXml(createActivities(xml).toXml(), xml, 'Test no laps');
 
 	// Test time-only lap at start/end works as expected.
         var xml = createXml([mixedActivity1]);

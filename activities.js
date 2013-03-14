@@ -3,16 +3,6 @@ Activities = function() {
   this.dom_ = createDiv('activities wide');
   this.dom_.innerHTML = 'No activities yet - load some!';
 };
-// This is only required because we currently skip empty activities
-// TODO: Remove this.
-Activities.prototype.maybeAddActivity_ = function(node) {
-  var activity = new Activity(node);
-  if (activity.laps_.length > 0) {
-    this.activities_.push(activity);
-  } else {
-    console.log('Skipping empty activity at start time ' + activity.startTime_);
-  }
-};
 Activities.prototype.addFromXml = function(node) {
   // Children may be Activity or MultiSportSession. For the latter, we
   // just pull out the Activity objects.
@@ -20,7 +10,7 @@ Activities.prototype.addFromXml = function(node) {
   for (var i = 0; i < node.childNodes.length; i++) {
     var child = node.childNodes[i];
     if (child.tagName === 'Activity') {
-      this.maybeAddActivity_(child);
+      this.activities_.push(new Activity(child));
     } else if (child.tagName === 'MultiSportSession') {
       for (var j = 0; j < child.childNodes.length; j++) {
         var grandChild = child.childNodes[j];
@@ -30,7 +20,7 @@ Activities.prototype.addFromXml = function(node) {
           if (greatGrandChild.tagName != 'Activity') {
             throw new Error('Unexpected tag \'' + greatGrandChild.tagName + '\' in \'' + grandChild.tagName + '\'');
           }
-          this.maybeAddActivity_(greatGrandChild);
+          this.activities_.push(new Activity(greatGrandChild));
         }
       }
     } else if (child.nodeName !== "#text") {
@@ -81,7 +71,11 @@ Activities.prototype.rebuildDom = function() {
     var collapser = createDiv('activity wide collapser');
     collapser.appendChild(createButton('Collapse activities ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseActivityWithPrevious(j); }; })(this, i + 1)));
     var table = document.createElement('table');
-    table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(end.timeFrom(start))]));
+    // TODO: Provide time deltas which skip over empty laps.
+    // TODO: Would be good not to need to know details of Activity.timeFrom().
+    if (!start.isEmpty() && !start.lastLap().isEmpty() && !end.isEmpty()) {
+      table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(end.timeFrom(start))]));
+    }
     // TODO: Provide distance deltas which skip over time-only laps.
     if (!start.isTimeOnly() && !end.isTimeOnly()) {
       table.appendChild(createTableRow('Displacement (m)', [end.displacementFrom(start)]));

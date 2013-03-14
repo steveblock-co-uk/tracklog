@@ -1,6 +1,6 @@
 Lap = function(parentActivity, node) {
   this.parentActivity_ = parentActivity;
-  // Metadata
+  // Lap holds all time and distance metadata.
   this.startTime_ = node.getAttribute('StartTime');
   this.totalTimeSeconds_ = Number(node.getElementsByTagName('TotalTimeSeconds')[0].textContent).valueOf();
   // We call this length to avoid confusion with Trackpoint.distanceMeters_.
