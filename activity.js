@@ -1,4 +1,5 @@
-Activity = function(node) {
+Activity = function(parentActivities, node) {
+  this.parentActivities_ = parentActivities;
   // All time and distance metadata is held by Lap.
   this.sport_ = node.getAttribute('Sport');
   this.id_ = node.getElementsByTagName('Id')[0].textContent;
@@ -32,7 +33,8 @@ Activity.prototype.onChildLapDistanceChanged = function(lap, delta) {
   }
 };
 Activity.prototype.onChildLapChanged = function() {
-  this.rebuildDom();
+  // This will call rebuildDom() on us.
+  this.parentActivities_.onChildActivityChanged();
 };
 Activity.prototype.time = function() {
   // We use the laps' recorded times, not their summed times.
@@ -189,6 +191,7 @@ Activity.prototype.removeLap = function(index) {
   }
   removeIndex(this.laps_, index);
   this.rebuildDom();
+  this.parentActivities_.onChildActivityChanged();
 };
 Activity.prototype.collapseLapWithPrevious = function(index) {
   if (index === 0 || index >= this.laps_.length) {
@@ -217,6 +220,7 @@ Activity.prototype.collapseLapWithPrevious = function(index) {
   }
   removeIndex(this.laps_, index);
   this.rebuildDom();
+  // There's no need to notify our parent, as our meta-data shouldn't have changed.
 };
 Activity.prototype.toXml = function() {
   var node = document.createElementNS(null, 'Activity');

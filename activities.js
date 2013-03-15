@@ -10,7 +10,7 @@ Activities.prototype.addFromXml = function(node) {
   for (var i = 0; i < node.childNodes.length; i++) {
     var child = node.childNodes[i];
     if (child.tagName === 'Activity') {
-      this.activities_.push(new Activity(child));
+      this.activities_.push(new Activity(this, child));
     } else if (child.tagName === 'MultiSportSession') {
       for (var j = 0; j < child.childNodes.length; j++) {
         var grandChild = child.childNodes[j];
@@ -20,7 +20,7 @@ Activities.prototype.addFromXml = function(node) {
           if (greatGrandChild.tagName != 'Activity') {
             throw new Error('Unexpected tag \'' + greatGrandChild.tagName + '\' in \'' + grandChild.tagName + '\'');
           }
-          this.activities_.push(new Activity(greatGrandChild));
+          this.activities_.push(new Activity(this, greatGrandChild));
         }
       }
     } else if (child.nodeName !== "#text") {
@@ -109,6 +109,9 @@ Activities.prototype.collapseActivityWithPrevious = function(index) {
     previousActivity.laps_.push(lap);
   }
   removeIndex(this.activities_, index);
+  this.rebuildDom();
+};
+Activities.prototype.onChildActivityChanged = function() {
   this.rebuildDom();
 };
 Activities.prototype.toXml = function() {
