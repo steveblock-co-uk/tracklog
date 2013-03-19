@@ -199,7 +199,6 @@ Activity.prototype.removeLap = function(index) {
     this.laps_[i].shiftDistances(delta);
   }
   removeIndex(this.laps_, index);
-  this.rebuildDom();
   this.parentActivities_.onChildActivityChanged();
 };
 Activity.prototype.collapseLapWithPrevious = function(index) {
