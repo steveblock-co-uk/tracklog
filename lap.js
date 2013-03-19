@@ -1,5 +1,7 @@
-Lap = function(parentActivity, node) {
+Lap = function(parentActivity) {
   this.parentActivity_ = parentActivity;
+};
+Lap.prototype.populate = function(node) {
   // Lap holds all time and distance metadata.
   this.startTime_ = node.getAttribute('StartTime');
   this.totalTimeSeconds_ = Number(node.getElementsByTagName('TotalTimeSeconds')[0].textContent).valueOf();
@@ -10,7 +12,9 @@ Lap = function(parentActivity, node) {
   this.tracks_ = [];
   for (var i = 0; i < node.childNodes.length; i++) {
     if (node.childNodes[i].tagName === 'Track') {
-      this.tracks_.push(new Track(node.childNodes[i]));
+      var track = new Track();
+      track.populate(node.childNodes[i]);
+      this.tracks_.push(track);
     }
   }
   this.checkConsistency();

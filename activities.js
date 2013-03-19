@@ -10,7 +10,9 @@ Activities.prototype.addFromXml = function(node) {
   for (var i = 0; i < node.childNodes.length; i++) {
     var child = node.childNodes[i];
     if (child.tagName === 'Activity') {
-      this.activities_.push(new Activity(this, child));
+      var activity = new Activity(this);
+      activity.populate(child);
+      this.activities_.push(activity);
     } else if (child.tagName === 'MultiSportSession') {
       for (var j = 0; j < child.childNodes.length; j++) {
         var grandChild = child.childNodes[j];
@@ -20,7 +22,9 @@ Activities.prototype.addFromXml = function(node) {
           if (greatGrandChild.tagName != 'Activity') {
             throw new Error('Unexpected tag \'' + greatGrandChild.tagName + '\' in \'' + grandChild.tagName + '\'');
           }
-          this.activities_.push(new Activity(this, greatGrandChild));
+          var activity = new Activity(this);
+          activity.populate(greatGrandChild);
+          this.activities_.push(activity);
         }
       }
     } else if (child.nodeName !== "#text") {

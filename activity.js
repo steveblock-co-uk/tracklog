@@ -1,12 +1,16 @@
-Activity = function(parentActivities, node) {
+Activity = function(parentActivities) {
   this.parentActivities_ = parentActivities;
+};
+Activity.prototype.populate = function(node) {
   // All time and distance metadata is held by Lap.
   this.sport_ = node.getAttribute('Sport');
   this.id_ = node.getElementsByTagName('Id')[0].textContent;
   this.laps_ = [];
   for (var i = 0; i < node.childNodes.length; i++) {
     if (node.childNodes[i].tagName === 'Lap') {
-      this.laps_.push(new Lap(this, node.childNodes[i]));
+      var lap = new Lap(this);
+      lap.populate(node.childNodes[i]);
+      this.laps_.push(lap);
     }
   }
   this.dom_ = createDiv('');

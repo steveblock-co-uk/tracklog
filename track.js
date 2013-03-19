@@ -1,9 +1,13 @@
-Track = function(node) {
+Track = function() {
+};
+Track.prototype.populate = function(node) {
   this.trackpoints_ = [];
   // No metadata and all children are type Trackpoint.
   var trackpoints = node.getElementsByTagName('Trackpoint');
   for (var i = 0; i < trackpoints.length; i++) {
-    this.trackpoints_.push(new Trackpoint(trackpoints[i]));
+    var trackpoint = new Trackpoint();
+    trackpoint.populate(trackpoints[i]);
+    this.trackpoints_.push(trackpoint);
   }
   this.checkConsistency();
   this.dom_ = document.createElement('table');
@@ -157,7 +161,9 @@ Track.prototype.toXml = function() {
   return node;
 };
 
-Trackpoint = function(node) {
+Trackpoint = function() {
+};
+Trackpoint.prototype.populate = function(node) {
   // We call this timestamp to avoid confusion with Lap.totalTimeSeconds_.
   this.timestamp_ = node.getElementsByTagName('Time')[0].textContent;
   if (node.getElementsByTagName('Position').length === 0) {
