@@ -120,10 +120,19 @@ Activity.prototype.deltaTime = function() {
 Activity.prototype.rebuildDom = function() {
   this.dom_.innerHTML = '';
   this.dom_.appendChild(createTextSpan('Sport'));
-  var sport = document.createElement('input');
-  sport.value = this.sport_;
-  sport.onchange = (function(activity) { return function() { activity.sport_ = this.value; }; })(this);
-  this.dom_.appendChild(sport);
+  var select = document.createElement('select');
+  var sports = ['Running', 'Biking', 'Other'];
+  for (var i in sports) {
+    var sport = document.createElement('option');
+    sport.textContent = sports[i];
+    sport.value = sports[i];
+    sport.selected = sports[i] === this.sport_;
+    select.appendChild(sport);
+  }
+  select.onchange = (function(activity) { return function() {
+    activity.sport_ = this.value;
+  }; })(this);
+  this.dom_.appendChild(select);
   this.dom_.appendChild(createTextSpan('Id'));
   var id = document.createElement('input');
   id.value = this.id_;
