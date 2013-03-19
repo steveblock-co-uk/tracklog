@@ -2,6 +2,7 @@
 <html>
   <head>
     <script type="text/javascript" src="utils.js"></script>
+    <script type="text/javascript" src="view.js"></script>
     <script type="text/javascript" src="activities.js"></script>
     <script type="text/javascript" src="activity.js"></script>
     <script type="text/javascript" src="lap.js"></script>
@@ -68,8 +69,9 @@
       //////////////////////////////////////////////////////////////////////////
       // Main
       function OnLoad() {
-        activities = new Activities();
-        document.getElementById('table').appendChild(activities.dom_);
+        var view = new ActivitiesView(map);
+        activities = new Activities(view);
+        document.getElementById('table').appendChild(view.getTableDom());
       }
 
       //////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,6 @@ Track.prototype.populate = function(node) {
     this.trackpoints_.push(trackpoint);
   }
   this.checkConsistency();
-  this.dom_ = document.createElement('table');
 };
 Track.prototype.checkConsistency = function() {
   // Tracks must not be emtpy.
@@ -79,41 +78,6 @@ Track.prototype.numTimeOnlyTrackpoints = function() {
     } 
   }
   return count;
-};
-Track.prototype.rebuildDom = function() {
-  this.dom_.innerHTML = '';
-  this.dom_.appendChild(createTableRow(
-      'Num trackpoints : time-only',
-      [this.trackpoints_.length, this.numTimeOnlyTrackpoints()]));
-  this.dom_.appendChild(createTableRow(
-      'Start : end : elapsed time',
-      [
-        this.firstTrackpoint().timestamp_,
-        this.lastTrackpoint().timestamp_,
-        toHourMinSec(this.time()),
-      ]));
-  if (this.isTimeOnly()) {
-    this.dom_.appendChild(createTableRow('No position data', []));
-    return;
-  }
-  var first = this.firstNonTimeOnlyTrackpoint();
-  var last = this.lastNonTimeOnlyTrackpoint();
-  this.dom_.appendChild(createTableRow(
-      'Start : end : delta distance (km)',
-      [
-        first.distanceMeters_ / 1000,
-        last.distanceMeters_ / 1000,
-        this.length() / 1000,
-      ]));
-  this.dom_.appendChild(createTableRow(
-      'Start : end altitude (m)',
-      [first.altitudeMeters_, last.altitudeMeters_]));
-  this.dom_.appendChild(createTableRow(
-      'Start : end latitude (deg)',
-      [first.latitudeDegrees_, last.latitudeDegrees_]));
-  this.dom_.appendChild(createTableRow(
-      'Start : end longitude (deg)',
-      [first.longitudeDegrees_, last.longitudeDegrees_]));
 };
 Track.prototype.shiftDistances = function(delta) {
   if (delta === 0) {

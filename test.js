@@ -33,8 +33,8 @@
 
 // Hacks
 // TODO: Fix this
-Activities.prototype.rebuildDom = function() {};
-Activity.prototype.rebuildDom = function() {};
+ActivitiesView.prototype.onPropertiesChanged = function() {};
+ActivityView.prototype.onPropertiesChanged = function() {};
 
 // Stub for testing
 // TODO: Fix this
@@ -141,7 +141,7 @@ function checkXml(actual, expected, description) {
 }
 
 function createActivities(xml) {
-  var activities = new Activities();
+  var activities = new Activities(new ActivitiesView());
   activities.addFromXml(xml);
   return activities;
 }

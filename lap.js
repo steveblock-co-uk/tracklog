@@ -1,5 +1,7 @@
-Lap = function(parentActivity) {
+Lap = function(parentActivity, observer) {
   this.parentActivity_ = parentActivity;
+  this.observer_ = observer;
+  this.observer_.setLap(this);
 };
 Lap.prototype.populate = function(node) {
   // Lap holds all time and distance metadata.
@@ -18,7 +20,6 @@ Lap.prototype.populate = function(node) {
     }
   }
   this.checkConsistency();
-  this.dom_ = createDiv('');
 };
 Lap.prototype.checkConsistency = function() {
   // May have no tracks, but only first and last tracks may be time-only.
@@ -133,68 +134,6 @@ Lap.prototype.endDistance = function() {
   }
   return this.lastNonTimeOnlyTrack().lastNonTimeOnlyTrackpoint().distanceMeters_;
 };
-Lap.prototype.rebuildDom = function() {
-  this.dom_.innerHTML = '';
-  var table = document.createElement('table');
-  if (!this.isEmpty()) {
-    table.appendChild(createTableRow('Start : end : delta time', [
-      this.startTime_,
-      this.endTime(),
-      toHourMinSec(this.deltaTime()),
-    ]));
-  }
-  table.appendChild(createTableRow('Elapsed time : summed (HH:MM:SS)', [
-    toHourMinSec(this.totalTimeSeconds_),
-    toHourMinSec(this.summedTime()),
-  ]));
-  if (!this.isTimeOnly()) {
-    table.appendChild(createTableRow('Start : end : delta distance (km)', [
-      this.startDistance() / 1000,
-      this.endDistance() / 1000,
-      (this.endDistance() - this.startDistance()) / 1000,
-    ]));
-  }
-  table.appendChild(createTableRow('Length : summed (km)', [
-    this.length_ / 1000,
-    this.summedLength() / 1000,
-  ]));
-  table.appendChild(createTableRow('Maximum speed (m/s)', [this.maximumSpeed_]));
-  table.appendChild(createTableRow('Calories', [this.calories_]));
-  table.appendChild(createTableRow(
-      'Num tracks : time-only',
-      [this.tracks_.length, this.numTimeOnlyTracks()]));
-  this.dom_.appendChild(table);
-  for (var i = 0; i < this.tracks_.length; i++) {
-    // Track
-    var div = createDiv('track wide');
-    div.appendChild(createTextSpan('Track ' + (i + 1) +' of ' + this.tracks_.length +
-        (this.tracks_[i].isTimeOnly() ? ' (time-only)' : '')));
-    div.appendChild(createButton(
-        'Remove',
-        (function(me, j) { return function() { me.removeTrack(j); }; })(this, i)));
-    this.tracks_[i].rebuildDom();
-    div.appendChild(this.tracks_[i].dom_);
-    this.dom_.appendChild(div);
-
-    // Deltas to next track
-    if (i === this.tracks_.length - 1) {
-      continue;
-    }
-    var start = this.tracks_[i];
-    var end = this.tracks_[i + 1];
-    var collapser = createDiv('track wide collapser');
-    // No need to be able to collapse tracks, as viewer ignores them anyway.
-    var table = document.createElement('table');
-    table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(end.timeFrom(start))]));
-    // TODO: Provide distance deltas which skip over time-only tracks.
-    if (!start.isTimeOnly() && !end.isTimeOnly()) {
-      table.appendChild(createTableRow('Distance difference (m)', [end.distanceFrom(start)]));
-      table.appendChild(createTableRow('Displacement (m)', [end.displacementFrom(start)]));
-    }
-    collapser.appendChild(table);
-    this.dom_.appendChild(collapser);
-  }
-};
 Lap.prototype.removeTrack = function(index) {
   console.log('Removing track ' + (index + 1) + ' of ' + this.tracks_.length);
   var track = this.tracks_[index];
@@ -219,7 +158,7 @@ Lap.prototype.removeTrack = function(index) {
 
   // We must make this call after updating all of our internal state, as our
   // parent activity will make use of it.
-  this.parentActivity_.onChildLapChanged();
+  this.observer_.onPropertiesChanged();
 };
 Lap.prototype.shiftDistances = function(delta) {
   if (delta === 0) {

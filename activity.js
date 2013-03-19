@@ -1,5 +1,6 @@
-Activity = function(parentActivities) {
-  this.parentActivities_ = parentActivities;
+Activity = function(observer) {
+  this.observer_ = observer;
+  this.observer_.setActivity(this);
 };
 Activity.prototype.populate = function(node) {
   // All time and distance metadata is held by Lap.
@@ -8,16 +9,17 @@ Activity.prototype.populate = function(node) {
   this.laps_ = [];
   for (var i = 0; i < node.childNodes.length; i++) {
     if (node.childNodes[i].tagName === 'Lap') {
-      var lap = new Lap(this);
+      var lap = new Lap(this, this.observer_.createLapObserver());
       lap.populate(node.childNodes[i]);
       this.laps_.push(lap);
     }
   }
-  this.dom_ = createDiv('');
 };
 Activity.prototype.isEmpty = function() {
   return this.laps_.length === 0;
-}
+};
+// This can't be a general observer method becuase the shift distance is a
+// specific property.
 Activity.prototype.onChildLapDistanceChanged = function(lap, delta) {
   // Shift all later laps by distance delta. Note that this activity's length
   // is calculated lazily.
@@ -37,10 +39,6 @@ Activity.prototype.onChildLapDistanceChanged = function(lap, delta) {
   for (++i; i < this.laps_.length; ++i) {
     this.laps_[i].shiftDistances(delta);
   }
-};
-Activity.prototype.onChildLapChanged = function() {
-  // This will call rebuildDom() on us.
-  this.parentActivities_.onChildActivityChanged();
 };
 Activity.prototype.time = function() {
   // We use the laps' recorded times, not their summed times.
@@ -123,75 +121,6 @@ Activity.prototype.endTime = function() {
 Activity.prototype.deltaTime = function() {
   return (new Date(this.endTime()) - new Date(this.startTime())) / 1000;
 };
-Activity.prototype.rebuildDom = function() {
-  this.dom_.innerHTML = '';
-  this.dom_.appendChild(createTextSpan('Sport'));
-  var select = document.createElement('select');
-  var sports = ['Running', 'Biking', 'Other'];
-  for (var i in sports) {
-    var sport = document.createElement('option');
-    sport.textContent = sports[i];
-    sport.value = sports[i];
-    sport.selected = sports[i] === this.sport_;
-    select.appendChild(sport);
-  }
-  select.onchange = (function(activity) { return function() {
-    activity.sport_ = this.value;
-  }; })(this);
-  this.dom_.appendChild(select);
-  this.dom_.appendChild(createTextSpan('Id'));
-  var id = document.createElement('input');
-  id.value = this.id_;
-  id.size = 50;
-  id.onchange = (function(activity) { return function() { activity.id_ = this.value; }; })(this);
-  this.dom_.appendChild(id);
-  var table = document.createElement('table');
-  // TODO: Would be good not to need to know details of startTime() and endTime().
-  if (!this.isEmpty() && !this.lastLap().isEmpty()) {
-    table.appendChild(createTableRow('Start : end : delta time', [
-      this.startTime(),
-      this.endTime(),
-      toHourMinSec(this.deltaTime()),
-    ]));
-  }
-  table.appendChild(createTableRow('Elapsed time (HH:MM:SS)', [toHourMinSec(this.time())]));
-  table.appendChild(createTableRow('Length (km)', [this.length() / 1000]));
-  table.appendChild(createTableRow(
-      'Num laps : time-only',
-      [this.laps_.length, this.numTimeOnlyLaps()]));
-  this.dom_.appendChild(table);
-  for (var i = 0; i < this.laps_.length; i++) {
-    // Lap
-    var div = createDiv('lap wide');
-    div.appendChild(createTextSpan('Lap ' + (i + 1) + ' of ' + this.laps_.length));
-    div.appendChild(createButton(
-        'Remove',
-        (function(me, j) { return function() { me.removeLap(j); }; })(this, i)));
-    this.laps_[i].rebuildDom();
-    div.appendChild(this.laps_[i].dom_);
-    this.dom_.appendChild(div);
-
-    // Deltas between laps
-    if (i === this.laps_.length - 1) {
-      continue;
-    }
-    var start = this.laps_[i];
-    var end = this.laps_[i + 1];
-    var collapser = createDiv('lap wide collapser');
-    collapser.appendChild(createButton('Collapse laps ' + (i + 1) + ' and ' + (i + 2), (function(me, j) { return function() { me.collapseLapWithPrevious(j); }; })(this, i + 1)));
-    var table = document.createElement('table');
-    if (!start.isEmpty() && !end.isEmpty()) {
-      table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(end.timeFrom(start))]));
-    }
-    // TODO: Provide distance deltas which skip over time-only laps.
-    if (!start.isTimeOnly() && !end.isTimeOnly()) {
-      table.appendChild(createTableRow('Distance difference (m)', [end.distanceFrom(start)]));
-      table.appendChild(createTableRow('Displacement (m)', [end.displacementFrom(start)]));
-    }
-    collapser.appendChild(table);
-    this.dom_.appendChild(collapser);
-  }
-};
 Activity.prototype.removeLap = function(index) {
   console.log('Removing lap ' + (index + 1) + ' of ' + this.laps_.length);
   // When removing a lap, we need to shift the distances of all later
@@ -205,7 +134,7 @@ Activity.prototype.removeLap = function(index) {
     this.laps_[i].shiftDistances(delta);
   }
   removeIndex(this.laps_, index);
-  this.parentActivities_.onChildActivityChanged();
+  this.observer_.onPropertiesChanged(true);
 };
 Activity.prototype.collapseLapWithPrevious = function(index) {
   if (index === 0 || index >= this.laps_.length) {
@@ -233,8 +162,8 @@ Activity.prototype.collapseLapWithPrevious = function(index) {
     previousLap.tracks_.push(thisLap.tracks_[i]);
   }
   removeIndex(this.laps_, index);
-  this.rebuildDom();
-  // There's no need to notify our parent, as our meta-data shouldn't have changed.
+  // We don't need a full update as our meta-data hasn't changed.
+  this.observer_.onPropertiesChanged(false);
 };
 Activity.prototype.toXml = function() {
   var node = document.createElementNS(null, 'Activity');
