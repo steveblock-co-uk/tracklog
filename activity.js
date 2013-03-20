@@ -30,8 +30,10 @@ Activity.prototype.onChildLapDistanceChanged = function(lap, delta) {
   if (i === this.laps_.length) {
     throw new Error('Failed to find lap!');
   }
-  console.log('Activity.onChildLapDistanceChanged(): Shifting laps ' +
-              (i + 2) + ' and later by ' + delta + 'm');
+  if (i < this.laps_.length - 1) {
+    console.log('Activity.onChildLapDistanceChanged(): Shifting laps ' +
+        (i + 2) + ' and later by ' + delta + 'm');
+  }
   for (++i; i < this.laps_.length; ++i) {
     this.laps_[i].shiftDistances(delta);
   }
