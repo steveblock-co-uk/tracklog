@@ -14,7 +14,7 @@ Lap.prototype.populate = function(node) {
   this.tracks_ = [];
   for (var i = 0; i < node.childNodes.length; i++) {
     if (node.childNodes[i].tagName === 'Track') {
-      var track = new Track();
+      var track = new Track(this.observer_.createTrackObserver());
       track.populate(node.childNodes[i]);
       this.tracks_.push(track);
     }

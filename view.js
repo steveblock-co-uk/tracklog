@@ -1,6 +1,7 @@
-ActivitiesView = function() {
+ActivitiesView = function(map) {
   this.tableDom_ = createDiv('activities wide');
   this.tableDom_.innerHTML = 'No activities yet - load some!';
+  this.map_ = map;
 };
 ActivitiesView.prototype.setActivities = function(activities) {
   this.model_ = activities;
@@ -9,7 +10,7 @@ ActivitiesView.prototype.onPropertiesChanged = function() {
   this.rebuildTableDom_();
 };
 ActivitiesView.prototype.createActivityObserver = function() {
-  return new ActivityView(this);
+  return new ActivityView(this, this.map_);
 };
 ActivitiesView.prototype.rebuildTableDom_ = function() {
   this.tableDom_.innerHTML = '';
@@ -65,9 +66,10 @@ ActivitiesView.prototype.getTableDom = function() {
   return this.tableDom_;
 };
 
-ActivityView = function(parent) {
+ActivityView = function(parent, map) {
   this.parent_ = parent;
   this.tableDom_ = createDiv('');
+  this.map_ = map;
 };
 ActivityView.prototype.setActivity = function(activity) {
   this.model_ = activity;
@@ -80,7 +82,7 @@ ActivityView.prototype.onPropertiesChanged = function(externallyVisible) {
   }
 };
 ActivityView.prototype.createLapObserver = function() {
-  return new LapView(this);
+  return new LapView(this, this.map_);
 };
 ActivityView.prototype.rebuildTableDom_ = function() {
   this.tableDom_.innerHTML = '';
@@ -160,14 +162,18 @@ ActivityView.prototype.rebuildTableDom_ = function() {
   return this.tableDom_;
 };
 
-LapView = function(parent) {
+LapView = function(parent, map) {
   this.parent_ = parent;
+  this.map_ = map;
 };
 LapView.prototype.setLap = function(lap) {
   this.model_ = lap;
 };
 LapView.prototype.onPropertiesChanged = function() {
   this.parent_.onPropertiesChanged();
+};
+LapView.prototype.createTrackObserver = function() {
+  return new TrackView(this.map_);
 };
 LapView.prototype.rebuildTableDom_ = function() {
   // The table DOM can be a local here, as it's never updated, always replaced.
@@ -212,7 +218,7 @@ LapView.prototype.rebuildTableDom_ = function() {
         (function(lap, j) {
           return function() { lap.removeTrack(j); };
         })(this.model_, i)));
-    div.appendChild(rebuildTrackTableDom(this.model_.tracks_[i]));
+    div.appendChild(this.model_.tracks_[i].observer_.rebuildTableDom());
     tableDom.appendChild(div);
 
     // Deltas to next track
@@ -236,32 +242,50 @@ LapView.prototype.rebuildTableDom_ = function() {
   return tableDom;
 };
 
-var rebuildTrackTableDom = function(track) {
+TrackView = function(map) {
+  // We need to cache the polyline, rather than just the path, so we can unset
+  // the map property to remove it from the map.
+  this.polyline_ = null;
+  if (map !== null) {
+    this.polyline_ = new google.maps.Polyline({
+      map: map,
+      clickable: false,
+      strokeWeight: 2,
+    });
+  }
+};
+TrackView.prototype.setTrack = function(track) {
+  this.model_ = track;
+};
+TrackView.prototype.onRouteChanged = function() {
+  this.updateMapLine_();
+};
+TrackView.prototype.rebuildTableDom = function() {
   // The table DOM can be a local here, as it's never updated, always replaced.
   var tableDom = document.createElement('table');
   tableDom.innerHTML = '';
   tableDom.appendChild(createTableRow(
       'Num trackpoints : time-only',
-      [track.trackpoints_.length, track.numTimeOnlyTrackpoints()]));
+      [this.model_.trackpoints_.length, this.model_.numTimeOnlyTrackpoints()]));
   tableDom.appendChild(createTableRow(
       'Start : end : elapsed time',
       [
-        track.firstTrackpoint().timestamp_,
-        track.lastTrackpoint().timestamp_,
-        toHourMinSec(track.time()),
+        this.model_.firstTrackpoint().timestamp_,
+        this.model_.lastTrackpoint().timestamp_,
+        toHourMinSec(this.model_.time()),
       ]));
-  if (track.isTimeOnly()) {
+  if (this.model_.isTimeOnly()) {
     tableDom.appendChild(createTableRow('No position data', []));
     return tableDom;
   }
-  var first = track.firstNonTimeOnlyTrackpoint();
-  var last = track.lastNonTimeOnlyTrackpoint();
+  var first = this.model_.firstNonTimeOnlyTrackpoint();
+  var last = this.model_.lastNonTimeOnlyTrackpoint();
   tableDom.appendChild(createTableRow(
       'Start : end : delta distance (km)',
       [
         first.distanceMeters_ / 1000,
         last.distanceMeters_ / 1000,
-        track.length() / 1000,
+        this.model_.length() / 1000,
       ]));
   tableDom.appendChild(createTableRow(
       'Start : end altitude (m)',
@@ -273,4 +297,19 @@ var rebuildTrackTableDom = function(track) {
       'Start : end longitude (deg)',
       [first.longitudeDegrees_, last.longitudeDegrees_]));
   return tableDom;
+};
+TrackView.prototype.updateMapLine_ = function() {
+  if (this.polyline_ === null) {
+    return;
+  }
+  // TODO: Modify the path, rather than resetting it?
+  var path = [];
+  for (var i = 0; i < this.model_.trackpoints_.length; i++) {
+    var trackpoint = this.model_.trackpoints_[i];
+    if (!trackpoint.isTimeOnly_) {
+      path.push(new google.maps.LatLng(
+          trackpoint.latitudeDegrees_, trackpoint.longitudeDegrees_));
+    }
+  }
+  this.polyline_.setPath(path);
 };

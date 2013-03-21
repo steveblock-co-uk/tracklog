@@ -7,6 +7,9 @@
     <script type="text/javascript" src="activity.js"></script>
     <script type="text/javascript" src="lap.js"></script>
     <script type="text/javascript" src="track.js"></script>
+    <script type="text/javascript"
+      src="http://maps.googleapis.com/maps/api/js?key=AIzaSyC2m1ZuGuWZswlxQdGB2BQXNoGo4aTNKNs&sensor=false">
+    </script>
     <script type="text/javascript">
       //////////////////////////////////////////////////////////////////////////
       // Globals
@@ -69,6 +72,14 @@
       //////////////////////////////////////////////////////////////////////////
       // Main
       function OnLoad() {
+        var map = null;
+        if (typeof google == "object") {
+          map = new google.maps.Map(document.getElementById('map'), {
+            center: new google.maps.LatLng(0, 0),
+            mapTypeId: google.maps.MapTypeId.ROADMAP,
+            zoom: 0,
+          });
+        }
         var view = new ActivitiesView(map);
         activities = new Activities(view);
         document.getElementById('table').appendChild(view.getTableDom());
@@ -201,6 +212,11 @@
       div#table {
         width: 700px;
       }
+      div#map {
+        float: right;
+        width: 600px;
+        height: 400px;
+      }
       span {
         margin-right: 10px;
       }
@@ -219,6 +235,7 @@
       <button onclick="dump()">Dump</button>
       <a href="" download="" id="dumpLink">download</a>
     </div>
+    <div id="map"></div>
     <div id="table"></div>
   <body>
 </html>

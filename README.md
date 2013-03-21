@@ -67,7 +67,6 @@ Plan
 
 TODOs
 
-- Show tracks on map
 - Allow manual override of displacement for merging laps/activities - does this make sense?
 - Recalc maximum speed
 

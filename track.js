@@ -1,4 +1,6 @@
-Track = function() {
+Track = function(observer) {
+  this.observer_ = observer;
+  this.observer_.setTrack(this);
 };
 Track.prototype.populate = function(node) {
   this.trackpoints_ = [];
@@ -10,6 +12,7 @@ Track.prototype.populate = function(node) {
     this.trackpoints_.push(trackpoint);
   }
   this.checkConsistency();
+  this.observer_.onRouteChanged();
 };
 Track.prototype.checkConsistency = function() {
   // Tracks must not be emtpy.

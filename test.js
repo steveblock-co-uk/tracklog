@@ -141,7 +141,7 @@ function checkXml(actual, expected, description) {
 }
 
 function createActivities(xml) {
-  var activities = new Activities(new ActivitiesView());
+  var activities = new Activities(new ActivitiesView(null));
   activities.addFromXml(xml);
   return activities;
 }
