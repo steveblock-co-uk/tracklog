@@ -47,6 +47,7 @@ Activities.prototype.removeActivity = function(index) {
   // The laps from this activity therefore remain independent of the laps
   // from the previous activity and no modification is required.
   console.log('Removing activity ' + (index + 1) + ' of ' + this.activities_.length);
+  this.activities_[index].observer_.onRemoved();
   removeIndex(this.activities_, index);
   this.observer_.onPropertiesChanged();
 };

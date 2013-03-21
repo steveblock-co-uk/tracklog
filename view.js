@@ -81,6 +81,9 @@ ActivityView.prototype.onPropertiesChanged = function(externallyVisible) {
     this.rebuildTableDom_();
   }
 };
+ActivityView.prototype.onRemoved = function() {
+  this.clearMapLine_();
+};
 ActivityView.prototype.createLapObserver = function() {
   return new LapView(this, this.map_);
 };
@@ -161,6 +164,11 @@ ActivityView.prototype.rebuildTableDom_ = function() {
   }
   return this.tableDom_;
 };
+ActivityView.prototype.clearMapLine_ = function() {
+  for (var i = 0; i < this.model_.laps_.length; i++) {
+    this.model_.laps_[i].observer_.clearMapLine_();
+  }
+};
 
 LapView = function(parent, map) {
   this.parent_ = parent;
@@ -171,6 +179,9 @@ LapView.prototype.setLap = function(lap) {
 };
 LapView.prototype.onPropertiesChanged = function() {
   this.parent_.onPropertiesChanged();
+};
+LapView.prototype.onRemoved = function() {
+  this.clearMapLine_();
 };
 LapView.prototype.createTrackObserver = function() {
   return new TrackView(this.map_);
@@ -241,6 +252,11 @@ LapView.prototype.rebuildTableDom_ = function() {
   }
   return tableDom;
 };
+LapView.prototype.clearMapLine_ = function() {
+  for (var i = 0; i < this.model_.tracks_.length; i++) {
+    this.model_.tracks_[i].observer_.clearMapLine_();
+  }
+};
 
 TrackView = function(map) {
   // We need to cache the polyline, rather than just the path, so we can unset
@@ -259,6 +275,9 @@ TrackView.prototype.setTrack = function(track) {
 };
 TrackView.prototype.onRouteChanged = function() {
   this.updateMapLine_();
+};
+TrackView.prototype.onRemoved = function() {
+  this.clearMapLine_();
 };
 TrackView.prototype.rebuildTableDom = function() {
   // The table DOM can be a local here, as it's never updated, always replaced.
@@ -312,4 +331,7 @@ TrackView.prototype.updateMapLine_ = function() {
     }
   }
   this.polyline_.setPath(path);
+};
+TrackView.prototype.clearMapLine_ = function() {
+  this.polyline_.setMap(null);
 };

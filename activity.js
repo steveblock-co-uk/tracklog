@@ -123,6 +123,7 @@ Activity.prototype.deltaTime = function() {
 };
 Activity.prototype.removeLap = function(index) {
   console.log('Removing lap ' + (index + 1) + ' of ' + this.laps_.length);
+  this.laps_[index].observer_.onRemoved();
   // When removing a lap, we need to shift the distances of all later
   // laps. Note that the length of this activity is calculated lazily. Note
   // also that we don't need to update later activities, as they use an

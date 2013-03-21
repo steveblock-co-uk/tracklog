@@ -35,6 +35,9 @@
 // TODO: Fix this
 ActivitiesView.prototype.onPropertiesChanged = function() {};
 ActivityView.prototype.onPropertiesChanged = function() {};
+ActivityView.prototype.onRemoved = function() {};
+LapView.prototype.onRemoved = function() {};
+TrackView.prototype.onRemoved = function() {};
 
 // Stub for testing
 // TODO: Fix this

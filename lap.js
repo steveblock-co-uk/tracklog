@@ -156,6 +156,8 @@ Lap.prototype.removeTrack = function(index) {
   removeIndex(this.tracks_, index);
   // TODO: Make an estimate of how to update calories?
 
+  track.observer_.onRemoved();
+
   // We must make this call after updating all of our internal state, as our
   // parent activity will make use of it.
   this.observer_.onPropertiesChanged();
