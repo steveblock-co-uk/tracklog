@@ -127,6 +127,24 @@ Track.prototype.toXml = function() {
   }
   return node;
 };
+Track.prototype.getPositionRange = function() {
+  if (this.isTimeOnly()) {
+    throw new Error('Can\'t get position ranges from time-only track');
+  }
+  var latitudes = [];
+  var longitudes = [];
+  this.trackpoints_.forEach(function(trackpoint) {
+    if (!trackpoint.isTimeOnly_) {
+      latitudes.push(trackpoint.latitudeDegrees_);
+      longitudes.push(trackpoint.longitudeDegrees_);
+    }
+  });
+  var range = {minimum: -180, maximum: 180};
+  return {
+    latitude: getMinimumRangeOfValues(latitudes, range),
+    longitude: getMinimumRangeOfValues(longitudes, range),
+  };
+};
 
 Trackpoint = function() {
 };

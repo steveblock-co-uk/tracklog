@@ -449,6 +449,175 @@
         activities.addFromXml(createXml([activity2]));
         checkXml(activities.toXml(), createXml([emptyActivity, activity2]),
 	    'Test adding activities to empty activity');
+
+        // Test getMinimumRangeOfValues() basic operation start.
+        var range = {minimum: -10, maximum: 10};
+        check(
+	    getMinimumRangeOfValues([-1, 1, 3], range).start,
+            -1,
+            'Test getMinimumRangeOfValues() basic operation start');
+
+        // Test getMinimumRangeOfValues() basic operation end.
+        check(
+	    getMinimumRangeOfValues([-1, 1, 3], range).end,
+            3,
+            'Test getMinimumRangeOfValues() basic operation end');
+
+        // Test getMinimumRangeOfValues() sorting.
+        check(
+	    getMinimumRangeOfValues([1, 3, -1], range).start,
+            -1,
+            'Test getMinimumRangeOfValues() sorting');
+
+        // Test getMinimumRangeOfValues() wrapping start.
+        check(
+            getMinimumRangeOfValues([-8, -9, 9], range).start,
+            9,
+            'Test getMinimumRangeOfValues() wrapping start');
+
+        // Test getMinimumRangeOfValues() wrapping end.
+        check(
+            getMinimumRangeOfValues([-8, -9, 9], range).end,
+            -8,
+            'Test getMinimumRangeOfValues() wrapping end');
+
+        // Test getMinimumRangeOfValues() input error start.
+        try {
+          getMinimumRangeOfValues([-11, 8, 9], range);
+          fail('Test getMinimumRangeOfValues() input error start did not throw');
+        } catch(e) {
+          pass('Test getMinimumRangeOfValues() input error start');
+        }
+
+        // Test getMinimumRangeOfValues() input error end.
+        try {
+          getMinimumRangeOfValues([-8, 11, 9], range);
+          fail('Test getMinimumRangeOfValues() input error end did not throw');
+        } catch(e) {
+          pass('Test getMinimumRangeOfValues() input error end');
+        }
+
+        // Test getMinimumRangeOfRanges() basic operation start.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 2}, {start: 3, end: 4}], range).start,
+            1,
+            'Test getMinimumRangeOfValues() basic operation start');
+
+        // Test getMinimumRangeOfRanges() basic operation end.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 2}, {start: 3, end: 4}], range).end,
+            4,
+            'Test getMinimumRangeOfValues() basic operation end');
+
+        // Test getMinimumRangeOfRanges() overlapping ranges start.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 3}, {start: 2, end: 4}], range).start,
+            1,
+            'Test getMinimumRangeOfValues() basic overlapping ranges start');
+
+        // Test getMinimumRangeOfRanges() overlapping ranges end.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 3}, {start: 2, end: 4}], range).end,
+            4,
+            'Test getMinimumRangeOfValues() basic overlapping ranges end');
+
+        // Test getMinimumRangeOfRanges() contained ranges start.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 4}, {start: 2, end: 3}], range).start,
+            1,
+            'Test getMinimumRangeOfValues() basic contained ranges start');
+
+        // Test getMinimumRangeOfRanges() contained ranges end.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 4}, {start: 2, end: 3}], range).end,
+            4,
+            'Test getMinimumRangeOfValues() basic contained ranges end');
+
+        // Test getMinimumRangeOfRanges() equal ranges.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 4}, {start: 1, end: 4}], range).start,
+            1,
+            'Test getMinimumRangeOfValues() equal ranges start');
+
+        // Test getMinimumRangeOfRanges() zero range.
+        check(
+            getMinimumRangeOfRanges([{start: 2, end: 2}, {start: 3, end: 4}], range).start,
+            2,
+            'Test getMinimumRangeOfValues() zero range');
+
+        // Test getMinimumRangeOfRanges() overflowing range start.
+        check(
+            getMinimumRangeOfRanges([{start: -10, end: 9}, {start: 8, end: -9}], range).start,
+            -10,
+            'Test getMinimumRangeOfValues() overflowing range start');
+
+        // Test getMinimumRangeOfRanges() wrapping start.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 2}, {start: 9, end: 1}], range).start,
+            9,
+            'Test getMinimumRangeOfValues() basic wrapping start');
+
+        // Test getMinimumRangeOfRanges() wrapping end.
+        check(
+            getMinimumRangeOfRanges([{start: 1, end: 2}, {start: 9, end: 1}], range).end,
+            2,
+            'Test getMinimumRangeOfValues() basic wrapping end');
+
+        // Test getMinimumRangeOfRanges() input error start of start.
+        try {
+          getMinimumRangeOfRanges([{start: -11, end: 2}], range);
+          fail('Test getMinimumRangeOfRanges() input error start of start did not throw');
+        } catch(e) {
+          pass('Test getMinimumRangeOfRanges() input error start of start');
+        }
+
+        // Test getMinimumRangeOfRanges() input error end of start.
+        try {
+          getMinimumRangeOfRanges([{start: 10, end: 2}], range);
+          fail('Test getMinimumRangeOfRanges() input error end of start did not throw');
+        } catch(e) {
+          pass('Test getMinimumRangeOfRanges() input error end of start');
+        }
+
+        // Test getMinimumRangeOfRanges() input error start of end.
+        try {
+          getMinimumRangeOfRanges([{start: 1, end: -11}], range);
+          fail('Test getMinimumRangeOfRanges() input error start of end did not throw');
+        } catch(e) {
+          pass('Test getMinimumRangeOfRanges() input error start of end');
+        }
+
+        // Test getMinimumRangeOfRanges() input error end of end.
+        try {
+          getMinimumRangeOfRanges([{start: 1, end: 10}], range);
+          fail('Test getMinimumRangeOfRanges() input error end of end did not throw');
+        } catch(e) {
+          pass('Test getMinimumRangeOfRanges() input error end of end');
+        }
+
+        // Test collapseRangeOfRanges() basic operation start.
+        check(
+            collapseRangeOfRanges([{start: 1, end: 3}, {start: 2, end: 4}], range).start,
+            1,
+            'Test collapseRangeOfRanges() basic operation start');
+
+        // Test collapseRangeOfRanges() basic operation end.
+        check(
+            collapseRangeOfRanges([{start: 1, end: 3}, {start: 2, end: 4}], range).end,
+            4,
+            'Test collapseRangeOfRanges() basic operation end');
+
+        // Test collapseRangeOfRanges() wrapped ranges start.
+        check(
+            collapseRangeOfRanges([{start: 1, end: 3}, {start: 9, end: -9}], range).start,
+            1,
+            'Test collapseRangeOfRanges() wrapped ranges start');
+
+        // Test collapseRangeOfRanges() wrapped ranges end.
+        check(
+            collapseRangeOfRanges([{start: 1, end: 3}, {start: 9, end: -9}], range).end,
+            -9,
+            'Test collapseRangeOfRanges() wrapped ranges end');
       }
     </script>
     <style type="text/css">

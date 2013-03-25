@@ -183,3 +183,15 @@ Lap.prototype.toXml = function() {
   }
   return node;
 };
+Lap.prototype.getPositionRanges = function() {
+  if (this.isTimeOnly()) {
+    throw new Error('Can\'t get position ranges from time-only lap');
+  }
+  var ranges = [];
+  this.tracks_.forEach(function(track) {
+    if (!track.isTimeOnly()) {
+      ranges.push(track.getPositionRange());
+    }
+  });
+  return ranges;
+};

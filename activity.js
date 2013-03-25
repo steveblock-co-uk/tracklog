@@ -175,3 +175,15 @@ Activity.prototype.toXml = function() {
   }
   return node;
 };
+Activity.prototype.getPositionRanges = function() {
+  if (this.isTimeOnly()) {
+    throw new Error('Can\'t get position ranges from time-only activity');
+  }
+  var ranges = [];
+  this.laps_.forEach(function(lap) {
+    if (!lap.isTimeOnly()) {
+      ranges = ranges.concat(lap.getPositionRanges());
+    }
+  });
+  return ranges;
+};

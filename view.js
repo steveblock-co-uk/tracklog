@@ -8,6 +8,7 @@ ActivitiesView.prototype.setActivities = function(activities) {
 };
 ActivitiesView.prototype.onPropertiesChanged = function() {
   this.rebuildTableDom_();
+  this.positionMap_();
 };
 ActivitiesView.prototype.createActivityObserver = function() {
   return new ActivityView(this, this.map_);
@@ -64,6 +65,24 @@ ActivitiesView.prototype.rebuildTableDom_ = function() {
 };
 ActivitiesView.prototype.getTableDom = function() {
   return this.tableDom_;
+};
+ActivitiesView.prototype.positionMap_ = function() {
+  if (this.map_ === null || this.model_.isTimeOnly()) {
+    return;
+  }
+  // Latitude can wrap, so we handle it differently from longitude.
+  var latitudeRanges = [];
+  var longitudeRanges = [];
+  this.model_.getPositionRanges().forEach(function(x) {
+    latitudeRanges.push(x.latitude);
+    longitudeRanges.push(x.longitude);
+  });
+  var range = {minimum: -180, maximum: 180};
+  var latitudeRange = getMinimumRangeOfRanges(latitudeRanges, range);
+  var longitudeRange = collapseRangeOfRanges(longitudeRanges, range);
+  this.map_.fitBounds(new google.maps.LatLngBounds(
+      new google.maps.LatLng(latitudeRange.start, longitudeRange.start),
+      new google.maps.LatLng(latitudeRange.end, longitudeRange.end)));
 };
 
 ActivityView = function(parent, map) {

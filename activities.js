@@ -77,3 +77,23 @@ Activities.prototype.toXml = function() {
   }
   return node;
 };
+Activities.prototype.isTimeOnly = function() {
+  for (var i = 0; i < this.activities_.length; i++) {
+    if (!this.activities_[i].isTimeOnly()) {
+      return false;
+    }
+  }
+  return true;
+};
+Activities.prototype.getPositionRanges = function() {
+  if (this.isTimeOnly()) {
+    throw new Error('Can\'t get position ranges from time-only activities');
+  }
+  var ranges = [];
+  this.activities_.forEach(function(activity) {
+    if (!activity.isTimeOnly()) {
+      ranges = ranges.concat(activity.getPositionRanges());
+    }
+  });
+  return ranges;
+};
