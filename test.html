@@ -168,7 +168,7 @@
         var xml = createXml([{laps: [mixedLap2]}]);
         try {
           createActivities(xml);
-          fail('Test time-only track in middle');
+          fail('Test time-only track in middle did not throw');
         } catch(e) {
           pass('Test time-only track in middle');
         }
@@ -185,7 +185,7 @@
         }]}]);
         try {
           createActivities(xml);
-          fail('Test no trackpoints');
+          fail('Test no trackpoints did not throw');
         } catch(e) {
           pass('Test no trackpoints');
         }
