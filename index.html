@@ -216,10 +216,15 @@
         text-align: left;
         border: 1px solid black;
       }
-      div#map {
-        float: right;
+      div#mapWrapper {
+        position: fixed;
         width: 600px;
-        height: 400px;
+        height: 800px;
+        top: 20px;
+        left: 900px;
+      }
+      div#map {
+        height: 100%;
       }
       span {
         margin-right: 10px;
@@ -239,7 +244,7 @@
       <button onclick="dump()">Dump</button>
       <a href="" download="" id="dumpLink">download</a>
     </div>
-    <div id="map"></div>
+    <div id="mapWrapper"><div id="map"></div></div>
     <div id="table"></div>
   <body>
 </html>
