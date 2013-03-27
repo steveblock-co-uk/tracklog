@@ -35,6 +35,18 @@ ActivitiesView.prototype.rebuildTableDom_ = function() {
           })(this.model_, i)));
     }
     div.appendChild(this.model_.activities_[i].observer_.rebuildTableDom_());
+    div.addEventListener('mouseover', (function(observer) { return function(event) {
+      observer.highlightMapLine_(true);
+      // We can't use CSS hover selectors because we don't want bubbling.
+      this.classList.add('highlight');
+      event.stopPropagation();
+    }; })(this.model_.activities_[i].observer_));
+    div.addEventListener('mouseout', (function(observer) { return function(event) {
+      observer.highlightMapLine_(false);
+      // We can't use CSS hover selectors because we don't want bubbling.
+      this.classList.remove('highlight');
+      event.stopPropagation();
+    }; })(this.model_.activities_[i].observer_));
     this.tableDom_.appendChild(div);
 
     // Deltas between activities
@@ -155,6 +167,18 @@ ActivityView.prototype.rebuildTableDom_ = function() {
           return function() { activity.removeLap(j); };
         })(this.model_, i)));
     div.appendChild(this.model_.laps_[i].observer_.rebuildTableDom_());
+    div.addEventListener('mouseover', (function(observer) { return function() {
+      observer.highlightMapLine_(true);
+      // We can't use CSS hover selectors because we don't want bubbling.
+      this.classList.add('highlight');
+      event.stopPropagation();
+    }; })(this.model_.laps_[i].observer_));
+    div.addEventListener('mouseout', (function(observer) { return function() {
+      observer.highlightMapLine_(false);
+      // We can't use CSS hover selectors because we don't want bubbling.
+      this.classList.remove('highlight');
+      event.stopPropagation();
+    }; })(this.model_.laps_[i].observer_));
     this.tableDom_.appendChild(div);
 
     // Deltas between laps
@@ -188,10 +212,16 @@ ActivityView.prototype.clearMapLine_ = function() {
     this.model_.laps_[i].observer_.clearMapLine_();
   }
 };
+ActivityView.prototype.highlightMapLine_ = function(highlight) {
+  for (var i = 0; i < this.model_.laps_.length; i++) {
+    this.model_.laps_[i].observer_.highlightMapLine_(highlight);
+  }
+};
 
 LapView = function(parent, map) {
   this.parent_ = parent;
   this.map_ = map;
+  this.tableDom_ = createDiv('');
 };
 LapView.prototype.setLap = function(lap) {
   this.model_ = lap;
@@ -206,9 +236,7 @@ LapView.prototype.createTrackObserver = function() {
   return new TrackView(this.map_);
 };
 LapView.prototype.rebuildTableDom_ = function() {
-  // The table DOM can be a local here, as it's never updated, always replaced.
-  var tableDom = createDiv('');
-  tableDom.innerHTML = '';
+  this.tableDom_.innerHTML = '';
   var table = document.createElement('table');
   if (!this.model_.isEmpty()) {
     table.appendChild(createTableRow('Start : end : delta time', [
@@ -237,7 +265,7 @@ LapView.prototype.rebuildTableDom_ = function() {
   table.appendChild(createTableRow(
       'Num tracks : time-only',
       [this.model_.tracks_.length, this.model_.numTimeOnlyTracks()]));
-  tableDom.appendChild(table);
+  this.tableDom_.appendChild(table);
   for (var i = 0; i < this.model_.tracks_.length; i++) {
     // Track
     var div = createDiv('track wide');
@@ -249,7 +277,19 @@ LapView.prototype.rebuildTableDom_ = function() {
           return function() { lap.removeTrack(j); };
         })(this.model_, i)));
     div.appendChild(this.model_.tracks_[i].observer_.rebuildTableDom());
-    tableDom.appendChild(div);
+    div.addEventListener('mouseover', (function(observer) { return function(event) {
+      observer.highlightMapLine_(true);
+      // We can't use CSS hover selectors because we don't want bubbling.
+      this.classList.add('highlight');
+      event.stopPropagation();
+    }; })(this.model_.tracks_[i].observer_));
+    div.addEventListener('mouseout', (function(observer) { return function(event) {
+      observer.highlightMapLine_(false);
+      // We can't use CSS hover selectors because we don't want bubbling.
+      this.classList.remove('highlight');
+      event.stopPropagation();
+    }; })(this.model_.tracks_[i].observer_));
+    this.tableDom_.appendChild(div);
 
     // Deltas to next track
     if (i === this.model_.tracks_.length - 1) {
@@ -267,13 +307,18 @@ LapView.prototype.rebuildTableDom_ = function() {
       table.appendChild(createTableRow('Displacement (m)', [end.displacementFrom(start)]));
     }
     collapser.appendChild(table);
-    tableDom.appendChild(collapser);
+    this.tableDom_.appendChild(collapser);
   }
-  return tableDom;
+  return this.tableDom_;
 };
 LapView.prototype.clearMapLine_ = function() {
   for (var i = 0; i < this.model_.tracks_.length; i++) {
     this.model_.tracks_[i].observer_.clearMapLine_();
+  }
+};
+LapView.prototype.highlightMapLine_ = function(highlight) {
+  for (var i = 0; i < this.model_.tracks_.length; i++) {
+    this.model_.tracks_[i].observer_.highlightMapLine_(highlight);
   }
 };
 
@@ -285,8 +330,8 @@ TrackView = function(map) {
     this.polyline_ = new google.maps.Polyline({
       map: map,
       clickable: false,
-      strokeWeight: 2,
     });
+    this.highlightMapLine_(false);
   }
 };
 TrackView.prototype.setTrack = function(track) {
@@ -353,4 +398,9 @@ TrackView.prototype.updateMapLine_ = function() {
 };
 TrackView.prototype.clearMapLine_ = function() {
   this.polyline_.setMap(null);
+};
+TrackView.prototype.highlightMapLine_ = function(highlight) {
+  if (this.polyline_ !== null) {
+    this.polyline_.setOptions({strokeWeight: highlight ? 5 : 2});
+  }
 };
