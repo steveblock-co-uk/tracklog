@@ -67,6 +67,8 @@ Plan
 
 TODOs
 
-- Allow manual override of displacement for merging laps/activities - does this make sense?
+- Allow insertion of new track to represent displacement between tracks. See
+  lap 3 of sanFranciscoRun.tcx
+- Allow manual override of displacement for merging laps/activities. Does this
+  make sense?
 - Recalc maximum speed
-
