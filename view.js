@@ -291,7 +291,7 @@ LapView.prototype.rebuildTableDom_ = function() {
     }; })(this.model_.tracks_[i].observer_));
     this.tableDom_.appendChild(div);
 
-    // Deltas to next track
+    // Deltas between tracks
     if (i === this.model_.tracks_.length - 1) {
       continue;
     }
@@ -303,8 +303,16 @@ LapView.prototype.rebuildTableDom_ = function() {
     table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(end.timeFrom(start))]));
     // TODO: Provide distance deltas which skip over time-only tracks.
     if (!start.isTimeOnly() && !end.isTimeOnly()) {
+      var displacement = end.displacementFrom(start);
       table.appendChild(createTableRow('Distance difference (m)', [end.distanceFrom(start)]));
-      table.appendChild(createTableRow('Displacement (m)', [end.displacementFrom(start)]));
+      table.appendChild(createTableRow('Displacement (m)', [displacement]));
+      if (displacement > 0) {
+        collapser.appendChild(createButton(
+            'Insert track with these properties',
+            (function(lap, j) {
+              return function() { lap.insertTrackToMeetNext(j); };
+            })(this.model_, i)));
+      }
     }
     collapser.appendChild(table);
     this.tableDom_.appendChild(collapser);

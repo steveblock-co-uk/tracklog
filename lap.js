@@ -195,3 +195,47 @@ Lap.prototype.getPositionRanges = function() {
   });
   return ranges;
 };
+Lap.prototype.insertTrackToMeetNext = function(index) {
+  console.log('insertTrackToMeetNext(): index=' + index);
+  var previous = this.tracks_[index];
+  var next = this.tracks_[index + 1];
+  if (previous.isTimeOnly() || next.isTimeOnly()) {
+    throw new Error('Can\'t insert track between time-only tracks');
+  }
+
+  var track = new Track(this.observer_.createTrackObserver());
+
+  var start = new Trackpoint();
+  start.setTimestamp(previous.lastTrackpoint().timestamp_);
+  var tp = previous.lastNonTimeOnlyTrackpoint();
+  start.setPosition(tp.latitudeDegrees_, tp.longitudeDegrees_,
+      tp.altitudeMeters_, tp.distanceMeters_);
+  track.trackpoints_.push(start);
+
+  // TODO: Make this editable?
+  var deltaDistance = next.displacementFrom(previous);
+
+  var end = new Trackpoint();
+  end.setTimestamp(next.firstTrackpoint().timestamp_);
+  var tp = next.firstNonTimeOnlyTrackpoint();
+  end.setPosition(tp.latitudeDegrees_, tp.longitudeDegrees_,
+      tp.altitudeMeters_, tp.distanceMeters_ + deltaDistance);
+  track.trackpoints_.push(end);
+
+  // TODO: Share with Track.populate()?
+  track.checkConsistency();
+  track.observer_.onRouteChanged();
+
+  for (var i = index + 1; i < this.tracks_.length; i++) {
+    console.log(
+        'Shifting track ' + (i + 1) + ' by delta ' + deltaDistance);
+    this.tracks_[i].shiftDistances(deltaDistance);
+  }
+  this.length_ += deltaDistance;
+  this.parentActivity_.onChildLapDistanceChanged(this, deltaDistance);
+  this.totalTimeSeconds_ += track.time();
+
+  this.tracks_.splice(index + 1, 0, track);
+
+  this.observer_.onPropertiesChanged();
+};

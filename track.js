@@ -1,9 +1,9 @@
 Track = function(observer) {
   this.observer_ = observer;
   this.observer_.setTrack(this);
+  this.trackpoints_ = [];
 };
 Track.prototype.populate = function(node) {
-  this.trackpoints_ = [];
   // No metadata and all children are type Trackpoint.
   var trackpoints = node.getElementsByTagName('Trackpoint');
   for (var i = 0; i < trackpoints.length; i++) {
@@ -147,24 +147,31 @@ Track.prototype.getPositionRange = function() {
 };
 
 Trackpoint = function() {
+  this.isTimeOnly_ = true;
 };
 Trackpoint.prototype.populate = function(node) {
-  // We call this timestamp to avoid confusion with Lap.totalTimeSeconds_.
-  this.timestamp_ = node.getElementsByTagName('Time')[0].textContent;
+  this.setTimestamp(node.getElementsByTagName('Time')[0].textContent);
   if (node.getElementsByTagName('Position').length === 0) {
-    this.isTimeOnly_ = true;
     return;
   }
-  this.isTimeOnly_ = false;
   var position = node.getElementsByTagName('Position')[0];
-  this.latitudeDegrees_ =
-      toNumber(position.getElementsByTagName('LatitudeDegrees')[0]);
-  this.longitudeDegrees_ =
-      toNumber(position.getElementsByTagName('LongitudeDegrees')[0]);
-  this.altitudeMeters_ =
-      toNumber(node.getElementsByTagName('AltitudeMeters')[0]);
-  this.distanceMeters_ =
-      toNumber(node.getElementsByTagName('DistanceMeters')[0]);
+  this.setPosition(
+      toNumber(position.getElementsByTagName('LatitudeDegrees')[0]),
+      toNumber(position.getElementsByTagName('LongitudeDegrees')[0]),
+      toNumber(node.getElementsByTagName('AltitudeMeters')[0]),
+      toNumber(node.getElementsByTagName('DistanceMeters')[0]));
+};
+Trackpoint.prototype.setTimestamp = function(timestamp) {
+  // We call this timestamp to avoid confusion with Lap.totalTimeSeconds_.
+  this.timestamp_ = timestamp;
+};
+Trackpoint.prototype.setPosition = function(latitude, longitude, altitude,
+    distance) {
+  this.isTimeOnly_ = false;
+  this.latitudeDegrees_ = latitude;
+  this.longitudeDegrees_ = longitude;
+  this.altitudeMeters_ = altitude;
+  this.distanceMeters_ = distance;
 };
 Trackpoint.prototype.distanceFrom = function(other) {
   if (this.isTimeOnly_ || other.isTimeOnly_) {
