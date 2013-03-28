@@ -134,7 +134,7 @@ Activity.prototype.removeLap = function(index) {
     console.log('Shifting lap ' + (i + 1) + ' by ' + delta + 'm');
     this.laps_[i].shiftDistances(delta);
   }
-  removeIndex(this.laps_, index);
+  this.laps_.splice(index, 1);
   this.observer_.onPropertiesChanged(true);
 };
 Activity.prototype.collapseLapWithPrevious = function(index) {
@@ -162,7 +162,7 @@ Activity.prototype.collapseLapWithPrevious = function(index) {
   for (var i = 0; i < thisLap.tracks_.length; i++) {
     previousLap.tracks_.push(thisLap.tracks_[i]);
   }
-  removeIndex(this.laps_, index);
+  this.laps_.splice(index, 1);
   // We don't need a full update as our meta-data hasn't changed.
   this.observer_.onPropertiesChanged(false);
 };

@@ -153,7 +153,7 @@ Lap.prototype.removeTrack = function(index) {
   }
   this.totalTimeSeconds_ -= track.time();
 
-  removeIndex(this.tracks_, index);
+  this.tracks_.splice(index, 1);
   // TODO: Make an estimate of how to update calories?
 
   track.observer_.onRemoved();

@@ -48,7 +48,7 @@ Activities.prototype.removeActivity = function(index) {
   // from the previous activity and no modification is required.
   console.log('Removing activity ' + (index + 1) + ' of ' + this.activities_.length);
   this.activities_[index].observer_.onRemoved();
-  removeIndex(this.activities_, index);
+  this.activities_.splice(index, 1);
   this.observer_.onPropertiesChanged();
 };
 Activities.prototype.collapseActivityWithPrevious = function(index) {
@@ -67,7 +67,7 @@ Activities.prototype.collapseActivityWithPrevious = function(index) {
     lap.shiftDistances(distance);
     previousActivity.laps_.push(lap);
   }
-  removeIndex(this.activities_, index);
+  this.activities_.splice(index, 1);
   this.observer_.onPropertiesChanged();
 };
 Activities.prototype.toXml = function() {
