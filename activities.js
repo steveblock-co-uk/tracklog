@@ -17,14 +17,14 @@ Activities.prototype.addFromXml = function(node) {
       for (var j = 0; j < child.childNodes.length; j++) {
         var grandChild = child.childNodes[j];
         if (grandChild.tagName === 'FirstSport' || grandChild.tagName === 'NextSport') {
-          // There should only be a single child, of type Activity.
-          var greatGrandChild = grandChild.childNodes[0];
-          if (greatGrandChild.tagName != 'Activity') {
-            throw new Error('Unexpected tag \'' + greatGrandChild.tagName + '\' in \'' + grandChild.tagName + '\'');
+          for (var k = 0; k < grandChild.childNodes.length; k++) {
+            var greatGrandChild = grandChild.childNodes[k];
+            if (greatGrandChild.tagName === 'Activity') {
+              var activity = new Activity(this.observer_.createActivityObserver());
+              activity.populate(greatGrandChild);
+              this.activities_.push(activity);
+            }
           }
-          var activity = new Activity(this.observer_.createActivityObserver());
-          activity.populate(greatGrandChild);
-          this.activities_.push(activity);
         }
       }
     } else if (child.nodeName !== "#text") {
