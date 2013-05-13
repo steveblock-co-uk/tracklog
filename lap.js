@@ -195,8 +195,8 @@ Lap.prototype.getPositionRanges = function() {
   });
   return ranges;
 };
-Lap.prototype.insertTrackToMeetNext = function(index) {
-  console.log('insertTrackToMeetNext(): index=' + index);
+Lap.prototype.insertTrackToMeetNext = function(index, elapsedTime) {
+  console.log('insertTrackToMeetNext(): index=' + index + ', elapsedTime=' + elapsedTime);
   var previous = this.tracks_[index];
   var next = this.tracks_[index + 1];
   if (previous.isTimeOnly() || next.isTimeOnly()) {
@@ -204,9 +204,11 @@ Lap.prototype.insertTrackToMeetNext = function(index) {
   }
 
   var track = new Track(this.observer_.createTrackObserver());
+  var endTimestamp = next.firstTrackpoint().timestamp_;
+  var startTimestamp = new Date(Date.parse(endTimestamp) - elapsedTime * 1000).toISOString();
 
   var start = new Trackpoint();
-  start.setTimestamp(previous.lastTrackpoint().timestamp_);
+  start.setTimestamp(startTimestamp);
   var tp = previous.lastNonTimeOnlyTrackpoint();
   start.setPosition(tp.latitudeDegrees_, tp.longitudeDegrees_,
       tp.altitudeMeters_, tp.distanceMeters_);
@@ -216,7 +218,7 @@ Lap.prototype.insertTrackToMeetNext = function(index) {
   var deltaDistance = next.displacementFrom(previous);
 
   var end = new Trackpoint();
-  end.setTimestamp(next.firstTrackpoint().timestamp_);
+  end.setTimestamp(endTimestamp);
   var tp = next.firstNonTimeOnlyTrackpoint();
   end.setPosition(tp.latitudeDegrees_, tp.longitudeDegrees_,
       tp.altitudeMeters_, tp.distanceMeters_ + deltaDistance);

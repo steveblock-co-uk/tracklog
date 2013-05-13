@@ -300,18 +300,34 @@ LapView.prototype.rebuildTableDom_ = function() {
     var collapser = createDiv('track wide collapser');
     // No need to be able to collapse tracks, as viewer ignores them anyway.
     var table = document.createElement('table');
-    table.appendChild(createTableRow('Time difference (HH:MM:SS)', [toHourMinSec(end.timeFrom(start))]));
+    var timeDifference = toHourMinSec(end.timeFrom(start));
+    table.appendChild(createTableRow('Time difference (HH:MM:SS)', [timeDifference]));
     // TODO: Provide distance deltas which skip over time-only tracks.
     if (!start.isTimeOnly() && !end.isTimeOnly()) {
       var displacement = end.displacementFrom(start);
       table.appendChild(createTableRow('Distance difference (m)', [end.distanceFrom(start)]));
       table.appendChild(createTableRow('Displacement (m)', [displacement]));
       if (displacement > 0) {
+        var tr = document.createElement('tr');
+        tr.appendChild(document.createElement('th'));
+        tr.appendChild(document.createElement('td'));
+        tr.firstChild.innerText = 'Elapsed Time';
+        elapsedTime = document.createElement('input');
+        elapsedTime.type = 'text';
+        elapsedTime.value = timeDifference;
+        elapsedTime.onchange = (function(value) { return function() {
+          if (!/^[0-9]{2}:[0-9]{2}:[0-9]{2}$/g.test(this.value) || this.value === '00:00:00')
+            this.value = value;
+        }; })(timeDifference);
+        tr.childNodes[1].appendChild(elapsedTime);
+        table.appendChild(tr);
         collapser.appendChild(createButton(
             'Insert track with these properties',
-            (function(lap, j) {
-              return function() { lap.insertTrackToMeetNext(j); };
-            })(this.model_, i)));
+            (function(lap, j, elapsedTime) {
+              return function() {
+                lap.insertTrackToMeetNext(j, fromHourMinSec(elapsedTime.value));
+              };
+            })(this.model_, i, elapsedTime)));
       }
     }
     collapser.appendChild(table);

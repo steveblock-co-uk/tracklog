@@ -38,6 +38,10 @@
             padWithLeadingZeros(mins, 2) + ':' +
             padWithLeadingZeros(secs, 2);
       }
+      function fromHourMinSec(string) {
+        var matches = /([0-9]{2}):([0-9]{2}):([0-9]{2})/.exec(string);
+        return 60 * 60 * parseInt(matches[1]) + 60 * parseInt(matches[2]) + parseInt(matches[3]);
+      }
       function createDiv(className) {
         var div = document.createElement('div');
         div.className = className;
