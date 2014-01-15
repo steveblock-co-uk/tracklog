@@ -19,12 +19,6 @@ Track.prototype.checkConsistency = function() {
   if (this.trackpoints_.length === 0) {
     throw new Error('Track must contain trackpoints');
   }
-  // Tracks may have at most one time-only trackpoint at each end.
-  for (var i = 1; i < this.trackpoints_.length - 1; ++i) {
-    if (this.trackpoints_[i].isTimeOnly_) {
-      throw new Error('Only first and last trackpoints may be time-only');
-    }
-  }
   // The previous code suggested the following rules.
   // TODO: Check this.
 /*
