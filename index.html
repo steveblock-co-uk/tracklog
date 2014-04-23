@@ -34,7 +34,7 @@
         secs = Math.abs(secs % (60 * 60));
         var mins = Math.floor(secs / 60);
         secs = Math.floor(secs % 60);
-        return padWithLeadingZeros(hours, 2) + ':' +
+        return hours + ':' +
             padWithLeadingZeros(mins, 2) + ':' +
             padWithLeadingZeros(secs, 2);
       }
