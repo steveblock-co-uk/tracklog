@@ -171,7 +171,7 @@ Lap.prototype.shiftDistances = function(delta) {
     this.tracks_[i].shiftDistances(delta);
   }
 };
-Lap.prototype.toXml = function() {
+Lap.prototype.toXml = function(trackpointWriteEveryNth) {
   var node = document.createElementNS(null, 'Lap');
   node.setAttribute('StartTime', this.startTime_);
   node.appendChild(createTextElement('TotalTimeSeconds', this.totalTimeSeconds_));
@@ -179,7 +179,7 @@ Lap.prototype.toXml = function() {
   node.appendChild(createTextElement('MaximumSpeed', this.maximumSpeed_));
   node.appendChild(createTextElement('Calories', this.calories_));
   for (var i = 0; i < this.tracks_.length; i++) {
-    node.appendChild(this.tracks_[i].toXml());
+    node.appendChild(this.tracks_[i].toXml(trackpointWriteEveryNth));
   }
   return node;
 };

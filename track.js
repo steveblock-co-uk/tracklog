@@ -114,11 +114,14 @@ Track.prototype.displacementFrom = function(other) {
   return this.firstNonTimeOnlyTrackpoint().displacementFrom(
       other.lastNonTimeOnlyTrackpoint());
 };
-Track.prototype.toXml = function() {
+Track.prototype.toXml = function(trackpointWriteEveryNth) {
+  if (trackpointWriteEveryNth === undefined)
+    trackpointWriteEveryNth = 1;
   var node = document.createElementNS(null, 'Track');
-  for (var i = 0; i < this.trackpoints_.length; i++) {
+  for (var i = 0; i < this.trackpoints_.length - 1; i += trackpointWriteEveryNth) {
     node.appendChild(this.trackpoints_[i].toXml());
   }
+  node.appendChild(this.trackpoints_[this.trackpoints_.length - 1].toXml());
   return node;
 };
 Track.prototype.getPositionRange = function() {

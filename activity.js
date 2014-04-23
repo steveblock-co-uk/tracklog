@@ -166,12 +166,12 @@ Activity.prototype.collapseLapWithPrevious = function(index) {
   // We don't need a full update as our meta-data hasn't changed.
   this.observer_.onPropertiesChanged(false);
 };
-Activity.prototype.toXml = function() {
+Activity.prototype.toXml = function(trackpointWriteEveryNth) {
   var node = document.createElementNS(null, 'Activity');
   node.setAttribute('Sport', this.sport_);
   node.appendChild(createTextElement('Id', this.id_));
   for (var i = 0; i < this.laps_.length; i++) {
-    node.appendChild(this.laps_[i].toXml());
+    node.appendChild(this.laps_[i].toXml(trackpointWriteEveryNth));
   }
   return node;
 };

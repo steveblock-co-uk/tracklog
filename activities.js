@@ -70,10 +70,10 @@ Activities.prototype.collapseActivityWithPrevious = function(index) {
   this.activities_.splice(index, 1);
   this.observer_.onPropertiesChanged();
 };
-Activities.prototype.toXml = function() {
+Activities.prototype.toXml = function(trackpointWriteEveryNth) {
   var node = document.createElementNS(null, 'Activities');
   for (var i = 0; i < this.activities_.length; i++) {
-    node.appendChild(this.activities_[i].toXml());
+    node.appendChild(this.activities_[i].toXml(trackpointWriteEveryNth));
   }
   return node;
 };

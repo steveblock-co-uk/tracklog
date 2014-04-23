@@ -169,7 +169,8 @@
         dumpLink.style.visibility = "hidden";
 
         var trainingCenterDatabase = root.firstChild;
-        trainingCenterDatabase.appendChild(activities.toXml());
+        var trackpointWriteEveryNth = parseInt(document.getElementById('trackpointWriteEveryNth').value);
+        trainingCenterDatabase.appendChild(activities.toXml(trackpointWriteEveryNth));
         var str = (new XMLSerializer).serializeToString(root);
         trainingCenterDatabase.removeChild(trainingCenterDatabase.firstChild);
 
@@ -248,6 +249,7 @@
       <span id="progress">Ready</span>
     </div>
     <div>
+      nth trackpoint to write <input type="number" value="1" id="trackpointWriteEveryNth"></input>
       <button onclick="dump()">Dump</button>
       <a href="" download="" id="dumpLink">download</a>
     </div>

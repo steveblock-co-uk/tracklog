@@ -28,7 +28,7 @@
         longitude: 9
       };
       var timeOnlyTrackpoint = {timestamp: '2013-01-01T00:00:03Z'};
-      var track1 = {trackpoints: [trackpoint1, trackpoint2]};
+      var track1 = {trackpoints: [trackpoint1, trackpoint2, trackpoint3, trackpoint1, trackpoint2, trackpoint3]};
       var track2 = {trackpoints: [trackpoint3]};
       var timeOnlyTrack = {trackpoints: [timeOnlyTrackpoint]};
       var mixedTrack1 = {trackpoints: [trackpoint1, timeOnlyTrackpoint]};
@@ -449,6 +449,15 @@
         activities.addFromXml(createXml([activity2]));
         checkXml(activities.toXml(), createXml([emptyActivity, activity2]),
 	    'Test adding activities to empty activity');
+
+        // Test writing every nth trackpoint.
+        json = clone([activity1]);
+        activities = createActivities(createXml(json));
+        json[0].laps[0].tracks[0].trackpoints = [trackpoint1, trackpoint3, trackpoint2, trackpoint3];
+        json[0].laps[1].tracks[0].trackpoints = [trackpoint3];
+        checkXml(activities.toXml(2), createXml(json),
+	    'Test writing every nth trackpoint');
+
 
         // Test getMinimumRangeOfValues() basic operation start.
         var range = {minimum: -10, maximum: 10};
