@@ -396,7 +396,7 @@ TrackView.prototype.rebuildTableDom = function() {
       ]));
   tableDom.appendChild(createTableRow(
       'Start : end altitude (m)',
-      [first.altitudeMeters_, last.altitudeMeters_]));
+      [first.altitudeMeters_, last.altitudeMeters_, this.model_.minAltitude(), this.model_.maxAltitude()]));
   tableDom.appendChild(createTableRow(
       'Start : end latitude (deg)',
       [first.latitudeDegrees_, last.latitudeDegrees_]));

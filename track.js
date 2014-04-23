@@ -142,6 +142,22 @@ Track.prototype.getPositionRange = function() {
     longitude: getMinimumRangeOfValues(longitudes, range),
   };
 };
+Track.prototype.minAltitude = function() {
+  var minAltitude = Infinity;
+  for (var i = 0; i < this.trackpoints_.length; ++i) {
+    if (!this.trackpoints_[i].isTimeOnly_)
+      minAltitude = Math.min(minAltitude, this.trackpoints_[i].altitudeMeters_);
+  }
+  return minAltitude;
+};
+Track.prototype.maxAltitude = function() {
+  var maxAltitude = -Infinity;
+  for (var i = 0; i < this.trackpoints_.length; ++i) {
+    if (!this.trackpoints_[i].isTimeOnly_)
+      maxAltitude = Math.max(maxAltitude, this.trackpoints_[i].altitudeMeters_);
+  }
+  return maxAltitude;
+};
 
 Trackpoint = function() {
   this.isTimeOnly_ = true;
